@@ -2,14 +2,6 @@ package com.wingman.ai
 
 import android.content.SharedPreferences
 
-enum class DatingStage {
-    AUTO_DETECT,
-    STAGE_1_HOOK_OPENER,
-    STAGE_2_BANTER_TEASE,
-    STAGE_3_COMMON_GROUND,
-    STAGE_4_DATE_CLOSER
-}
-
 enum class LanguageMode {
     ENGLISH,
     HINGLISH,
@@ -34,7 +26,7 @@ data class UserVitals(
 )
 
 data class UserLifestyle(
-    val datingIntention: String = "Long-term, open to short", // e.g. "Looking for a relationship", "Figuring it out"
+    val datingIntention: String = "Long-term, open to short",
     val workout: String = "Active / Gym",
     val drinking: String = "Socially",
     val smoking: String = "Never",
@@ -58,29 +50,27 @@ data class FullUserProfile(
     val preferredHumor: HumorFlavor = HumorFlavor.WITTY_TEASE
 ) {
     companion object {
+        // Safely injected from BuildConfig at build time (e.g. from GitHub Secret or local.properties), never hardcoded in git
+        val BUNDLED_DEFAULT_API_KEY: String
+            get() = BuildConfig.DEFAULT_GEMINI_API_KEY
+
         fun fromPreferences(prefs: SharedPreferences): FullUserProfile {
-            val hobbiesStr = prefs.getString("user_hobbies", null)
-                ?: prefs.getString("user_passions", "") ?: ""
-            val hobbiesList = hobbiesStr.split(",")
-                .map { it.trim() }
-                .filter { it.isNotBlank() }
-
-            val cityStr = prefs.getString("user_city", null)
-                ?: prefs.getString("user_spots", "") ?: ""
-
-            val habitsStr = prefs.getString("user_habits", "") ?: ""
+            val city = prefs.getString("user_city", null) ?: prefs.getString("user_spots", "") ?: ""
+            val hobbiesRaw = prefs.getString("user_hobbies", null) ?: prefs.getString("user_passions", "") ?: ""
+            val hobbiesList = hobbiesRaw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
 
             return FullUserProfile(
                 vitals = UserVitals(
                     name = prefs.getString("user_name", "") ?: "",
                     age = prefs.getString("user_age", "25")?.toIntOrNull() ?: 25,
-                    height = prefs.getString("user_height", "") ?: "",
-                    city = cityStr,
-                    work = prefs.getString("user_work", "") ?: ""
+                    height = prefs.getString("user_height", "5'11") ?: "5'11",
+                    city = city,
+                    work = prefs.getString("user_work", "") ?: "",
+                    college = prefs.getString("user_college", "") ?: ""
                 ),
                 lifestyle = UserLifestyle(
-                    datingIntention = prefs.getString("user_intent", "Looking for connection") ?: "",
-                    workout = habitsStr
+                    datingIntention = prefs.getString("user_intent", "Connection") ?: "Connection",
+                    workout = prefs.getString("user_habits", "Active") ?: "Active"
                 ),
                 interests = UserInterests(
                     hobbies = hobbiesList,

@@ -55,7 +55,8 @@ object PhotoAuditor {
         apiKey: String,
         base64Images: List<String>
     ): PhotoAuditReport? = withContext(Dispatchers.IO) {
-        if (apiKey.isBlank() || base64Images.isEmpty()) return@withContext null
+        val effectiveKey = apiKey.ifBlank { FullUserProfile.BUNDLED_DEFAULT_API_KEY }.trim()
+        if (effectiveKey.isBlank() || base64Images.isEmpty()) return@withContext null
 
         val systemPrompt = """
             You are an elite dating photo consultant with deep expertise in dating app psychology (Hinge, Tinder, Bumble).
@@ -118,7 +119,7 @@ object PhotoAuditor {
             add("generationConfig", genConfig)
         }
 
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/$PRIMARY_MODEL:generateContent?key=$apiKey"
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$PRIMARY_MODEL:generateContent?key=$effectiveKey"
         val request = Request.Builder()
             .url(url)
             .post(requestJson.toString().toRequestBody(jsonMediaType))

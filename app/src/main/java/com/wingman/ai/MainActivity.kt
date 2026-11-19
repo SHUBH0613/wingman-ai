@@ -78,16 +78,6 @@ class MainActivity : AppCompatActivity() {
         updateOverlayButtonState()
     }
 
-    private fun updateOverlayButtonState() {
-        if (FloatingOverlayService.isRunning) {
-            btnToggleOverlay.text = "Stop Floating Overlay Bubble"
-            btnToggleOverlay.backgroundTintList = getColorStateList(R.color.surface_variant)
-        } else {
-            btnToggleOverlay.text = "Start Floating Overlay Bubble (⚡ Auto-Type)"
-            btnToggleOverlay.backgroundTintList = getColorStateList(R.color.primary)
-        }
-    }
-
     private fun initViews() {
         etApiKey = findViewById(R.id.etApiKey)
         etName = findViewById(R.id.etName)
@@ -128,7 +118,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupListeners() {
         btnSaveSettings.setOnClickListener {
             saveSettings()
-            Toast.makeText(this, "Profile & settings saved!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Profile & API Key saved!", Toast.LENGTH_SHORT).show()
         }
 
         btnSelectPhotos.setOnClickListener {
@@ -143,13 +133,13 @@ class MainActivity : AppCompatActivity() {
 
         btnToggleOverlay.setOnClickListener {
             saveSettings()
-            checkOverlayPermissionAndStart()
+            toggleOverlayService()
         }
 
         btnEnableAccessibility.setOnClickListener {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
             startActivity(intent)
-            Toast.makeText(this, "Enable 'Wingman Dating Assistant' for Auto-Type!", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Enable 'Wingman Dating Assistant' for Auto-Read & Auto-Type!", Toast.LENGTH_LONG).show()
         }
 
         btnEnableKeyboard.setOnClickListener {
@@ -159,12 +149,32 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun runProfileGeneration() {
-        val apiKey = etApiKey.text.toString().trim()
-        if (apiKey.isBlank()) {
-            Toast.makeText(this, "Please enter your Gemini API Key!", Toast.LENGTH_SHORT).show()
-            return
+    private fun updateOverlayButtonState() {
+        if (FloatingOverlayService.isRunning) {
+            btnToggleOverlay.text = "Stop Floating Overlay Bubble"
+            btnToggleOverlay.setBackgroundColor(android.graphics.Color.parseColor("#475569"))
+        } else {
+            btnToggleOverlay.text = "Start Floating Overlay Bubble (⚡ Auto-Type Ready)"
+            btnToggleOverlay.setBackgroundColor(android.graphics.Color.parseColor("#E11D48"))
         }
+    }
+
+    private fun toggleOverlayService() {
+        if (FloatingOverlayService.isRunning) {
+            val stopIntent = Intent(this, FloatingOverlayService::class.java).apply {
+                action = FloatingOverlayService.ACTION_STOP
+            }
+            startService(stopIntent)
+            Toast.makeText(this, "Floating Overlay Stopped", Toast.LENGTH_SHORT).show()
+            btnToggleOverlay.text = "Start Floating Overlay Bubble (⚡ Auto-Type Ready)"
+            btnToggleOverlay.setBackgroundColor(android.graphics.Color.parseColor("#E11D48"))
+        } else {
+            checkOverlayPermissionAndStart()
+        }
+    }
+
+    private fun runProfileGeneration() {
+        val apiKey = etApiKey.text.toString().trim().ifBlank { FullUserProfile.BUNDLED_DEFAULT_API_KEY }
 
         tvProfileResult.visibility = View.VISIBLE
         tvProfileResult.text = "Crafting high-conversion Hinge & Bumble packs with Gemini..."
@@ -191,85 +201,70 @@ class MainActivity : AppCompatActivity() {
                 }
                 tvProfileResult.text = sb.toString()
             } else {
-                tvProfileResult.text = "Generation failed. Verify network and Gemini API key."
+                tvProfileResult.text = "Generation failed. Verify network connection."
             }
         }
     }
 
     private fun auditSelectedPhotos(uris: List<Uri>) {
-        val apiKey = etApiKey.text.toString().trim()
-        if (apiKey.isBlank()) {
-            Toast.makeText(this, "Please enter your Gemini API Key first!", Toast.LENGTH_SHORT).show()
-            return
-        }
+        val apiKey = etApiKey.text.toString().trim().ifBlank { FullUserProfile.BUNDLED_DEFAULT_API_KEY }
 
         tvPhotoAuditResult.visibility = View.VISIBLE
-        tvPhotoAuditResult.text = "Compressing & auditing ${uris.size} photos with Gemini Vision..."
+        tvPhotoAuditResult.text = "Downsampling & auditing ${uris.size} photos with Gemini Vision..."
 
         lifecycleScope.launch {
             val base64List = withContext(Dispatchers.IO) {
                 uris.mapNotNull { uri ->
                     try {
-                        // Pass 1: Decode image dimensions only
-                        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                         contentResolver.openInputStream(uri)?.use { input ->
+                            // Two-pass memory-safe downsampling to prevent OOM
+                            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                             BitmapFactory.decodeStream(input, null, options)
-                        }
 
-                        if (options.outWidth <= 0 || options.outHeight <= 0) return@mapNotNull null
-
-                        // Calculate inSampleSize for efficient downsampling (max dimension ~800px)
-                        val maxTargetDim = 800
-                        var sampleSize = 1
-                        while (options.outWidth / (sampleSize * 2) >= maxTargetDim ||
-                            options.outHeight / (sampleSize * 2) >= maxTargetDim) {
-                            sampleSize *= 2
-                        }
-
-                        // Pass 2: Decode downsampled bitmap
-                        val decodeOptions = BitmapFactory.Options().apply {
-                            inSampleSize = sampleSize
-                            inPreferredConfig = Bitmap.Config.RGB_565
-                        }
-
-                        val bitmap = contentResolver.openInputStream(uri)?.use { input ->
-                            BitmapFactory.decodeStream(input, null, decodeOptions)
-                        } ?: return@mapNotNull null
-
-                        val w = bitmap.width
-                        val h = bitmap.height
-                        if (w <= 0 || h <= 0) {
-                            bitmap.recycle()
-                            return@mapNotNull null
-                        }
-
-                        // Scale smoothly to max dimension 640px
-                        val finalW: Int
-                        val finalH: Int
-                        if (w >= h) {
-                            finalW = minOf(640, w)
-                            finalH = maxOf(1, (h * finalW) / w)
-                        } else {
-                            finalH = minOf(640, h)
-                            finalW = maxOf(1, (w * finalH) / h)
-                        }
-
-                        val scaled = if (w != finalW || h != finalH) {
-                            Bitmap.createScaledBitmap(bitmap, finalW, finalH, true).also {
-                                if (it != bitmap) bitmap.recycle()
+                            val targetSize = 640
+                            var inSampleSize = 1
+                            if (options.outHeight > targetSize || options.outWidth > targetSize) {
+                                val halfHeight = options.outHeight / 2
+                                val halfWidth = options.outWidth / 2
+                                while (halfHeight / inSampleSize >= targetSize && halfWidth / inSampleSize >= targetSize) {
+                                    inSampleSize *= 2
+                                }
                             }
-                        } else {
-                            bitmap
-                        }
 
-                        val baos = ByteArrayOutputStream()
-                        scaled.compress(Bitmap.CompressFormat.JPEG, 75, baos)
-                        scaled.recycle()
-                        Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
-                    } catch (e: Throwable) {
+                            contentResolver.openInputStream(uri)?.use { secondInput ->
+                                val decodeOptions = BitmapFactory.Options().apply {
+                                    this.inSampleSize = inSampleSize
+                                    inPreferredConfig = Bitmap.Config.RGB_565
+                                }
+                                val bitmap = BitmapFactory.decodeStream(secondInput, null, decodeOptions)
+                                    ?: return@use null
+
+                                val scaled = if (bitmap.width > targetSize || bitmap.height > targetSize) {
+                                    val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+                                    val newW = if (ratio >= 1) targetSize else (targetSize * ratio).toInt()
+                                    val newH = if (ratio >= 1) (targetSize / ratio).toInt() else targetSize
+                                    Bitmap.createScaledBitmap(bitmap, newW.coerceAtLeast(1), newH.coerceAtLeast(1), true)
+                                } else {
+                                    bitmap
+                                }
+
+                                val baos = ByteArrayOutputStream()
+                                scaled.compress(Bitmap.CompressFormat.JPEG, 75, baos)
+                                val b64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+                                if (scaled != bitmap) scaled.recycle()
+                                bitmap.recycle()
+                                b64
+                            }
+                        }
+                    } catch (t: Throwable) {
                         null
                     }
                 }
+            }
+
+            if (base64List.isEmpty()) {
+                tvPhotoAuditResult.text = "Could not process selected photos. Please try different images."
+                return@launch
             }
 
             val report = PhotoAuditor.auditPhotos(apiKey, base64List)
@@ -289,7 +284,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 tvPhotoAuditResult.text = sb.toString()
             } else {
-                tvPhotoAuditResult.text = "Audit failed. Check network or Gemini API key."
+                tvPhotoAuditResult.text = "Audit failed. Check network or verify API key."
             }
         }
     }
@@ -308,7 +303,7 @@ class MainActivity : AppCompatActivity() {
                 workout = etHabits.text.toString().trim()
             ),
             interests = UserInterests(
-                hobbies = etHobbiesSkills.text.toString().split(",").map { it.trim() }.filter { it.isNotBlank() },
+                hobbies = etHobbiesSkills.text.toString().split(",").map { it.trim() }.filter { it.isNotEmpty() },
                 musicAndFood = etMusicFood.text.toString().trim()
             )
         )
@@ -316,7 +311,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadSettings() {
         val prefs = getSharedPreferences("wingman_prefs", Context.MODE_PRIVATE)
-        etApiKey.setText(prefs.getString("gemini_api_key", ""))
+        val savedKey = prefs.getString("gemini_api_key", "") ?: ""
+        etApiKey.setText(if (savedKey.isNotBlank()) savedKey else FullUserProfile.BUNDLED_DEFAULT_API_KEY)
+
         etName.setText(prefs.getString("user_name", ""))
         etAge.setText(prefs.getString("user_age", ""))
         etHeight.setText(prefs.getString("user_height", ""))
@@ -330,8 +327,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveSettings() {
         val prefs = getSharedPreferences("wingman_prefs", Context.MODE_PRIVATE)
+        val keyToSave = etApiKey.text.toString().trim().ifBlank { FullUserProfile.BUNDLED_DEFAULT_API_KEY }
         prefs.edit()
-            .putString("gemini_api_key", etApiKey.text.toString().trim())
+            .putString("gemini_api_key", keyToSave)
             .putString("user_name", etName.text.toString().trim())
             .putString("user_age", etAge.text.toString().trim())
             .putString("user_height", etHeight.text.toString().trim())
@@ -345,16 +343,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkOverlayPermissionAndStart() {
-        if (FloatingOverlayService.isRunning) {
-            val stopIntent = Intent(this, FloatingOverlayService::class.java).apply {
-                action = FloatingOverlayService.ACTION_STOP
-            }
-            startService(stopIntent)
-            Toast.makeText(this, "Wingman Floating Bubble Stopped.", Toast.LENGTH_SHORT).show()
-            btnToggleOverlay.postDelayed({ updateOverlayButtonState() }, 200)
-            return
-        }
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             Toast.makeText(this, "Please grant 'Display over other apps' permission", Toast.LENGTH_LONG).show()
             val intent = Intent(
@@ -369,8 +357,9 @@ class MainActivity : AppCompatActivity() {
             } else {
                 startService(intent)
             }
-            Toast.makeText(this, "Wingman Floating Bubble Started! (⚡ Auto-Type Ready)", Toast.LENGTH_LONG).show()
-            btnToggleOverlay.postDelayed({ updateOverlayButtonState() }, 200)
+            Toast.makeText(this, "Wingman Floating Bubble Started! (⚡ Anti-Ban Stealth Ready)", Toast.LENGTH_LONG).show()
+            btnToggleOverlay.text = "Stop Floating Overlay Bubble"
+            btnToggleOverlay.setBackgroundColor(android.graphics.Color.parseColor("#475569"))
         }
     }
 }

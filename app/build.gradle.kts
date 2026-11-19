@@ -13,10 +13,17 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+
+        // Securely read API key from environment variable (GitHub Secrets) or project property; never stored in git
+        val apiKey = (project.findProperty("GEMINI_API_KEY") as? String)
+            ?: System.getenv("GEMINI_API_KEY")
+            ?: ""
+        buildConfigField("String", "DEFAULT_GEMINI_API_KEY", "\"$apiKey\"")
     }
 
     buildFeatures {
-        viewBinding = true
+        buildConfig = true
+        viewBinding = false
     }
 
     compileOptions {
@@ -31,11 +38,11 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.material)
     implementation(libs.kotlinx.coroutines.android)
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.1")
     implementation(libs.okhttp)
     implementation(libs.gson)
-    testImplementation(libs.junit)
+    testImplementation("junit:junit:4.13.2")
 }

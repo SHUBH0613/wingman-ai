@@ -47,7 +47,8 @@ object ProfileGenerator {
         apiKey: String,
         profile: FullUserProfile
     ): ProfileResult? = withContext(Dispatchers.IO) {
-        if (apiKey.isBlank()) return@withContext null
+        val effectiveKey = apiKey.ifBlank { FullUserProfile.BUNDLED_DEFAULT_API_KEY }.trim()
+        if (effectiveKey.isBlank()) return@withContext null
 
         val systemPrompt = """
             You are the world's leading dating profile consultant specializing in male profiles for Hinge and Bumble.
@@ -120,7 +121,7 @@ object ProfileGenerator {
             add("generationConfig", genConfig)
         }
 
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/$PRIMARY_MODEL:generateContent?key=$apiKey"
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$PRIMARY_MODEL:generateContent?key=$effectiveKey"
         val request = Request.Builder()
             .url(url)
             .post(requestJson.toString().toRequestBody(jsonMediaType))

@@ -10,6 +10,14 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
+enum class DatingStage {
+    AUTO_DETECT,
+    STAGE_1_HOOK_OPENER,
+    STAGE_2_BANTER_TEASE,
+    STAGE_3_COMMON_GROUND,
+    STAGE_4_DATE_CLOSER
+}
+
 data class DatingReplyBundle(
     val detectedStage: String,
     val options: List<String>,
@@ -29,16 +37,35 @@ object GeminiDatingEngine {
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
     fun cleanJson(raw: String): String {
-        var cleaned = raw.trim()
-        if (cleaned.startsWith("```json", ignoreCase = true)) {
-            cleaned = cleaned.substring(7).trim()
-        } else if (cleaned.startsWith("```")) {
-            cleaned = cleaned.substring(3).trim()
+        var text = raw.trim()
+        if (text.startsWith("```")) {
+            val firstLineBreak = text.indexOf('\n')
+            if (firstLineBreak != -1) {
+                text = text.substring(firstLineBreak + 1)
+            }
+            if (text.endsWith("```")) {
+                text = text.substring(0, text.length - 3)
+            }
         }
-        if (cleaned.endsWith("```")) {
-            cleaned = cleaned.substring(0, cleaned.length - 3).trim()
+        return text.trim()
+    }
+
+    /**
+     * Sanitizes extracted screen text to protect against adversarial prompt injection
+     */
+    fun sanitizeInputContext(rawContext: String): String {
+        val dangerousPatterns = listOf(
+            Regex("(?i)ignore (all )?previous instructions"),
+            Regex("(?i)system prompt"),
+            Regex("(?i)you are now a"),
+            Regex("(?i)reveal secret"),
+            Regex("(?i)forget your rules")
+        )
+        var sanitized = rawContext
+        for (pattern in dangerousPatterns) {
+            sanitized = sanitized.replace(pattern, "[redacted]")
         }
-        return cleaned
+        return sanitized.take(1500)
     }
 
     suspend fun generateReplies(
@@ -49,56 +76,60 @@ object GeminiDatingEngine {
         language: LanguageMode,
         flavor: HumorFlavor
     ): DatingReplyBundle = withContext(Dispatchers.IO) {
-        if (apiKey.isBlank()) {
+        val effectiveKey = apiKey.ifBlank { FullUserProfile.BUNDLED_DEFAULT_API_KEY }.trim()
+        if (effectiveKey.isBlank()) {
             return@withContext DatingReplyBundle(
                 detectedStage = "ERROR",
-                options = listOf("Please add your Gemini API Key in Wingman Settings first!"),
-                strategicTip = "API key missing."
+                options = listOf("Please enter or verify your Gemini API Key in Settings!"),
+                strategicTip = "Missing API key."
             )
         }
+
+        val cleanContext = sanitizeInputContext(contextText)
 
         val languageInstructions = when (language) {
             LanguageMode.ENGLISH -> "Respond in natural, witty, modern English."
             LanguageMode.HINGLISH -> """
-                Respond in authentic HINGLISH (Hindi-English mix commonly texted by young professionals in Mumbai, Delhi, Bangalore).
-                Use casual romanized Hindi ('scene kya hai', 'batao', 'sahi hai', 'drama', 'chai/coffee pe chalte hain').
-                Avoid overly formal or cringe Bollywood lines; keep it charming, urban, and modern.
+                Respond in authentic HINGLISH (natural Hindi-English mix as texted by urban 20-somethings in Mumbai, Delhi, Bangalore).
+                Use casual romanized words like 'scene kya hai', 'batao', 'sahi hai', 'drama', 'chai/coffee pe chalte hain'.
+                Avoid cringe or overly formal Bollywood lines; keep it charming, urban, and effortless.
             """.trimIndent()
-            LanguageMode.BILINGUAL_MIX -> "Provide a mix: Option 1 in English, Option 2 in Hinglish, Option 3 in a smooth bilingual blend."
+            LanguageMode.BILINGUAL_MIX -> "Option 1 in English, Option 2 in Hinglish, Option 3 in a smooth bilingual blend."
         }
 
         val flavorInstructions = when (flavor) {
-            HumorFlavor.WITTY_TEASE -> "High playful push-pull, light teasing, self-assured confidence."
-            HumorFlavor.FILMY_DESI -> "Subtle, witty pop-culture or cinema references (Imtiaz Ali, Bollywood music, iconic relatable debates)."
+            HumorFlavor.WITTY_TEASE -> "High-status playful push-pull, light teasing, teasing challenges, self-assured confidence."
+            HumorFlavor.FILMY_DESI -> "Pop-culture wit, cinema references (Imtiaz Ali vs Anurag Kashyap, indie music, relatable debates)."
             HumorFlavor.DRY_SARCASM -> "Deadpan, observant, clever sarcasm, zero exclamation marks."
             HumorFlavor.DATE_CLOSER -> "Smooth, casual pivot to meeting for coffee, drinks, or matcha this Thursday or Friday."
         }
 
         val systemPrompt = """
-            You are Wingman AI, an elite dating conversational strategist for Bumble, Hinge, and Instagram DMs.
+            You are Wingman AI, an elite dating conversational strategist specializing in "The High-Status Charmer" archetype.
             You have studied top-performing male profiles, viral Instagram hook formats, and high-conversion dating psychology.
             
-            USER CONTEXT:
+            USER PROFILE CONTEXT:
             - Name: ${profile.vitals.name}
-            - City / Favorite Spots: ${profile.vitals.city.ifBlank { "Local coffee shops or speakeasies" }}
-            - Career / College: ${profile.vitals.work} / ${profile.vitals.college}
-            - Hobbies / Passions: ${profile.interests.hobbies.joinToString(", ")}
-            - Dating Goals: ${profile.lifestyle.datingIntention}
+            - City / Favorite Spots: ${profile.vitals.city.ifBlank { "Local coffee spots or rooftop bars" }}
+            - Career / Education: ${profile.vitals.work} / ${profile.vitals.college}
+            - Hobbies & Quirks: ${profile.interests.hobbies.joinToString(", ")}
+            - Dating Intention: ${profile.lifestyle.datingIntention}
             
-            LANGUAGE & STYLE:
+            LANGUAGE & TONE:
             $languageInstructions
             $flavorInstructions
             
-            REQUESTED STAGE: ${stage.name}
+            STAGE GOAL: ${stage.name}
             
-            CRITICAL RULES FOR DATING CHAT:
-            1. Zero generic AI phrases ('That sounds fascinating!', 'I completely understand', etc.).
-            2. Match texting etiquette: 1 to 2 lines max, casual punctuation, natural flow.
-            3. Never be lame or overly eager. Maintain equal or higher status with warmth.
-            4. If OPENER: focus on a specific, non-obvious detail from her bio or photo.
-            5. If DATE CLOSER: propose a concrete low-pressure activity in ${profile.vitals.city.ifBlank { "the city" }} this week.
+            THE HIGH-STATUS CHARMER RULES:
+            1. NEVER sound like a generic AI or eager text bot. No 'That sounds fascinating!', 'Oh wow!', or polite essays.
+            2. Match texting etiquette: 1 to 2 lines max, casual capitalization, conversational punctuation.
+            3. Maintain high status: You are playfully confident, observant, slightly challenging, and never seeking approval.
+            4. If OPENER: focus on a specific, non-obvious detail from her bio or photo. Never use 'Hey' or compliment appearance directly.
+            5. If BANTER: use subtle push-pull ('We would either be best friends or rivals, no in-between').
+            6. If DATE CLOSER: propose a concrete low-pressure activity in ${profile.vitals.city.ifBlank { "the city" }} on Thursday or Friday.
             
-            Return ONLY a valid JSON object matching this schema:
+            Return ONLY a valid JSON object matching:
             {
               "detectedStage": "Banter & Chemistry",
               "options": [
@@ -110,7 +141,7 @@ object GeminiDatingEngine {
             }
         """.trimIndent()
 
-        val prompt = "Match Profile / Chat Context:\n\"$contextText\"\n\nGenerate the 3 options and strategic tip."
+        val prompt = "Conversation History / Match Profile Context:\n\"$cleanContext\"\n\nGenerate the 3 options and strategic tip."
 
         val requestJson = JsonObject().apply {
             val contentsArray = com.google.gson.JsonArray()
@@ -132,7 +163,7 @@ object GeminiDatingEngine {
             add("generationConfig", genConfig)
         }
 
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/$PRIMARY_MODEL:generateContent?key=$apiKey"
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$PRIMARY_MODEL:generateContent?key=$effectiveKey"
         val request = Request.Builder()
             .url(url)
             .post(requestJson.toString().toRequestBody(jsonMediaType))
@@ -145,27 +176,24 @@ object GeminiDatingEngine {
             if (!response.isSuccessful) {
                 return@withContext DatingReplyBundle(
                     detectedStage = "ERROR",
-                    options = listOf("Error calling Gemini: HTTP ${response.code}"),
-                    strategicTip = "Check network or API key."
+                    options = listOf("Error calling Gemini API: HTTP ${response.code}"),
+                    strategicTip = "Check network or verify API key."
                 )
             }
 
             val responseObj = gson.fromJson(body, JsonObject::class.java)
-            val candidates = responseObj?.getAsJsonArray("candidates")
+            val candidates = responseObj.getAsJsonArray("candidates")
             if (candidates != null && candidates.size() > 0) {
                 val candidate = candidates[0].asJsonObject
                 val content = candidate.getAsJsonObject("content")
                 val parts = content?.getAsJsonArray("parts")
                 if (parts != null && parts.size() > 0) {
-                    val rawText = parts[0].asJsonObject.get("text")?.asString?.trim() ?: ""
-                    val cleaned = cleanJson(rawText)
-                    val bundle = gson.fromJson(cleaned, DatingReplyBundle::class.java)
-                    if (bundle != null && bundle.options.isNotEmpty()) {
-                        return@withContext bundle
-                    }
+                    val rawText = parts[0].asJsonObject.get("text")?.asString ?: "{}"
+                    val clean = cleanJson(rawText)
+                    return@withContext gson.fromJson(clean, DatingReplyBundle::class.java)
                 }
             }
-            DatingReplyBundle("UNKNOWN", listOf("Could not parse response."), "")
+            DatingReplyBundle("UNKNOWN", listOf("Could not parse response from Gemini."), "")
         } catch (e: Exception) {
             DatingReplyBundle("ERROR", listOf("Failed to connect: ${e.localizedMessage ?: "Unknown"}"), "")
         }

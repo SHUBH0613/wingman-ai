@@ -8,6 +8,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
@@ -34,7 +35,18 @@ class FloatingOverlayService : Service() {
     companion object {
         var isRunning = false
             private set
-        const val ACTION_STOP = "com.wingman.ai.action.STOP"
+        const val ACTION_STOP = "com.wingman.ai.ACTION_STOP"
+
+        // Anti-Ban Velocity Tracker
+        private var recentTypeTimestamps = mutableListOf<Long>()
+        fun checkSpamVelocity(): Boolean {
+            val now = System.currentTimeMillis()
+            recentTypeTimestamps.removeAll { now - it > 120_000 } // Keep last 2 minutes
+            return recentTypeTimestamps.size >= 6
+        }
+        fun recordTypeEvent() {
+            recentTypeTimestamps.add(System.currentTimeMillis())
+        }
     }
 
     private lateinit var windowManager: WindowManager
@@ -51,6 +63,14 @@ class FloatingOverlayService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        return START_STICKY
+    }
+
     override fun onCreate() {
         super.onCreate()
         isRunning = true
@@ -59,14 +79,6 @@ class FloatingOverlayService : Service() {
         startForegroundServiceNotification()
         setupBubbleView()
         setupMenuView()
-    }
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            stopSelf()
-            return START_NOT_STICKY
-        }
-        return START_STICKY
     }
 
     private fun startForegroundServiceNotification() {
@@ -78,7 +90,7 @@ class FloatingOverlayService : Service() {
                 NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(channel)
+            manager.createNotificationChannel(channel)
         }
 
         val notification: Notification = NotificationCompat.Builder(this, channelId)
@@ -87,8 +99,8 @@ class FloatingOverlayService : Service() {
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(101, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(101, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
             startForeground(101, notification)
         }
@@ -140,14 +152,14 @@ class FloatingOverlayService : Service() {
                     }
                     bubbleParams!!.x = initialX + deltaX
                     bubbleParams!!.y = initialY + deltaY
-                    try {
+                    if (bubbleView.isAttachedToWindow) {
                         windowManager.updateViewLayout(bubbleView, bubbleParams)
-                    } catch (_: Exception) {}
+                    }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
                     if (isClick) {
-                        openMenu()
+                        openMenuAndAutoDraft()
                     }
                     true
                 }
@@ -155,9 +167,7 @@ class FloatingOverlayService : Service() {
             }
         }
 
-        try {
-            windowManager.addView(bubbleView, bubbleParams)
-        } catch (_: Exception) {}
+        windowManager.addView(bubbleView, bubbleParams)
     }
 
     private fun setupMenuView() {
@@ -186,16 +196,10 @@ class FloatingOverlayService : Service() {
         val btnOpener = menuView.findViewById<Button>(R.id.btnActionOpener)
         val btnBanter = menuView.findViewById<Button>(R.id.btnActionBanter)
         val btnDate = menuView.findViewById<Button>(R.id.btnActionDate)
-        val etContext = menuView.findViewById<EditText>(R.id.etChatContext)
-        val progressBar = menuView.findViewById<ProgressBar>(R.id.progressBar)
-        val tvOption1 = menuView.findViewById<TextView>(R.id.tvOption1)
-        val tvOption2 = menuView.findViewById<TextView>(R.id.tvOption2)
-        val tvOption3 = menuView.findViewById<TextView>(R.id.tvOption3)
         val btnAutoType = menuView.findViewById<Button>(R.id.btnAutoType)
 
         btnClose.setOnClickListener { closeMenu() }
 
-        // Language toggle
         tvLangEn.setOnClickListener {
             activeLanguage = LanguageMode.ENGLISH
             tvLangEn.setBackgroundColor(Color.parseColor("#E11D48"))
@@ -212,92 +216,109 @@ class FloatingOverlayService : Service() {
             tvLangEn.setTextColor(Color.parseColor("#94A3B8"))
         }
 
-        fun triggerAi(stage: DatingStage) {
-            val prefs = getSharedPreferences("wingman_prefs", Context.MODE_PRIVATE)
-            val apiKey = prefs.getString("gemini_api_key", "") ?: ""
-
-            val profile = FullUserProfile.fromPreferences(prefs)
-
-            // 1. Check user-typed context, 2. Accessibility screen text, 3. Clipboard
-            var contextText = etContext.text.toString().trim()
-            if (contextText.isBlank()) {
-                contextText = WingmanAccessibilityService.getVisibleScreenText()
-            }
-            if (contextText.isBlank()) {
-                val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                if (clipboard.hasPrimaryClip() && clipboard.primaryClip != null && clipboard.primaryClip!!.itemCount > 0) {
-                    contextText = clipboard.primaryClip!!.getItemAt(0)?.text?.toString() ?: ""
-                }
-            }
-
-            if (contextText.isNotBlank()) {
-                etContext.setText(contextText.take(150))
-            }
-            progressBar.visibility = View.VISIBLE
-            btnAutoType.visibility = View.GONE
-            tvOption1.text = "Crafting human-like responses with Gemini..."
-            tvOption2.visibility = View.GONE
-            tvOption3.visibility = View.GONE
-
-            serviceScope.launch {
-                val bundle = GeminiDatingEngine.generateReplies(
-                    apiKey = apiKey,
-                    contextText = contextText,
-                    stage = stage,
-                    profile = profile,
-                    language = activeLanguage,
-                    flavor = HumorFlavor.WITTY_TEASE
-                )
-                progressBar.visibility = View.GONE
-
-                val results = bundle.options
-                if (results.isNotEmpty()) {
-                    selectedReply = results[0]
-                    tvOption1.text = results[0]
-                    highlightOption(tvOption1, tvOption2, tvOption3)
-                    btnAutoType.visibility = View.VISIBLE
-                    tvOption1.setOnClickListener {
-                        selectedReply = results[0]
-                        highlightOption(tvOption1, tvOption2, tvOption3)
-                    }
-
-                    if (results.size > 1) {
-                        tvOption2.visibility = View.VISIBLE
-                        tvOption2.text = results[1]
-                        tvOption2.setOnClickListener {
-                            selectedReply = results[1]
-                            highlightOption(tvOption2, tvOption1, tvOption3)
-                        }
-                    }
-                    if (results.size > 2) {
-                        tvOption3.visibility = View.VISIBLE
-                        tvOption3.text = results[2]
-                        tvOption3.setOnClickListener {
-                            selectedReply = results[2]
-                            highlightOption(tvOption3, tvOption1, tvOption2)
-                        }
-                    }
-                }
-            }
-        }
-
         btnOpener.setOnClickListener { triggerAi(DatingStage.STAGE_1_HOOK_OPENER) }
         btnBanter.setOnClickListener { triggerAi(DatingStage.STAGE_2_BANTER_TEASE) }
         btnDate.setOnClickListener { triggerAi(DatingStage.STAGE_4_DATE_CLOSER) }
 
-        // Auto-Type execution
+        // Anti-Ban Humanized Stealth Auto-Type
         btnAutoType.setOnClickListener {
             if (selectedReply.isNotBlank()) {
-                val typed = WingmanAccessibilityService.autoTypeIntoChat(selectedReply)
-                if (typed) {
-                    Toast.makeText(this, "⚡ Auto-typed! Review and press Send.", Toast.LENGTH_SHORT).show()
-                } else {
-                    // Fallback to clipboard
-                    val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("Reply", selectedReply))
-                    Toast.makeText(this, "Copied to clipboard! (Enable Accessibility for auto-typing)", Toast.LENGTH_LONG).show()
+                if (checkSpamVelocity()) {
+                    Toast.makeText(this, "⏳ Anti-Ban: Slow down for 30s to keep profile safe!", Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
                 }
+
+                recordTypeEvent()
+                val textToInject = selectedReply
+
+                // Minimize menu first to prevent touch-obscuring security flags
                 closeMenu()
+
+                serviceScope.launch {
+                    val typed = WingmanAccessibilityService.autoTypeWithHumanJitter(textToInject)
+                    if (typed) {
+                        Toast.makeText(this@FloatingOverlayService, "⚡ Auto-typed! Review and press Send.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Reply", textToInject))
+                        Toast.makeText(this@FloatingOverlayService, "Copied to clipboard! (Enable Accessibility for auto-typing)", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun triggerAi(stage: DatingStage) {
+        val prefs = getSharedPreferences("wingman_prefs", Context.MODE_PRIVATE)
+        val apiKey = prefs.getString("gemini_api_key", "") ?: FullUserProfile.BUNDLED_DEFAULT_API_KEY
+        val profile = FullUserProfile.fromPreferences(prefs)
+
+        val etContext = menuView.findViewById<EditText>(R.id.etChatContext)
+        val progressBar = menuView.findViewById<ProgressBar>(R.id.progressBar)
+        val btnAutoType = menuView.findViewById<Button>(R.id.btnAutoType)
+        val tvOption1 = menuView.findViewById<TextView>(R.id.tvOption1)
+        val tvOption2 = menuView.findViewById<TextView>(R.id.tvOption2)
+        val tvOption3 = menuView.findViewById<TextView>(R.id.tvOption3)
+
+        // Auto-read messages from screen
+        var contextText = WingmanAccessibilityService.extractChatContext()
+        if (contextText.isBlank()) {
+            contextText = etContext.text.toString().trim()
+        }
+        if (contextText.isBlank()) {
+            val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+            val primaryClip = clipboard.primaryClip
+            if (primaryClip != null && primaryClip.itemCount > 0) {
+                contextText = primaryClip.getItemAt(0)?.text?.toString() ?: ""
+            }
+        }
+
+        etContext.setText(contextText.take(150))
+        progressBar.visibility = View.VISIBLE
+        btnAutoType.visibility = View.GONE
+        tvOption1.text = "Reading chat & crafting charming replies..."
+        tvOption2.visibility = View.GONE
+        tvOption3.visibility = View.GONE
+
+        serviceScope.launch {
+            val bundle = GeminiDatingEngine.generateReplies(
+                apiKey = apiKey,
+                contextText = contextText,
+                stage = stage,
+                profile = profile,
+                language = activeLanguage,
+                flavor = HumorFlavor.WITTY_TEASE
+            )
+            progressBar.visibility = View.GONE
+
+            val results = bundle.options
+            if (results.isNotEmpty()) {
+                selectedReply = results[0]
+                tvOption1.text = results[0]
+                btnAutoType.visibility = View.VISIBLE
+                highlightOption(tvOption1, tvOption2, tvOption3)
+
+                tvOption1.setOnClickListener {
+                    selectedReply = results[0]
+                    highlightOption(tvOption1, tvOption2, tvOption3)
+                }
+
+                if (results.size > 1) {
+                    tvOption2.visibility = View.VISIBLE
+                    tvOption2.text = results[1]
+                    tvOption2.setOnClickListener {
+                        selectedReply = results[1]
+                        highlightOption(tvOption2, tvOption1, tvOption3)
+                    }
+                }
+                if (results.size > 2) {
+                    tvOption3.visibility = View.VISIBLE
+                    tvOption3.text = results[2]
+                    tvOption3.setOnClickListener {
+                        selectedReply = results[2]
+                        highlightOption(tvOption3, tvOption1, tvOption2)
+                    }
+                }
             }
         }
     }
@@ -308,35 +329,19 @@ class FloatingOverlayService : Service() {
         other2.setBackgroundColor(Color.parseColor("#334155"))
     }
 
-    private fun openMenu() {
+    private fun openMenuAndAutoDraft() {
         if (!isMenuOpen) {
-            // Auto pre-populate context if empty
-            val etContext = menuView.findViewById<EditText>(R.id.etChatContext)
-            if (etContext.text.isNullOrBlank()) {
-                val screenText = WingmanAccessibilityService.getVisibleScreenText()
-                if (screenText.isNotBlank()) {
-                    etContext.setText(screenText.take(150))
-                } else {
-                    val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                    if (clipboard.hasPrimaryClip() && clipboard.primaryClip != null && clipboard.primaryClip!!.itemCount > 0) {
-                        val clip = clipboard.primaryClip!!.getItemAt(0)?.text?.toString() ?: ""
-                        if (clip.isNotBlank()) etContext.setText(clip.take(150))
-                    }
-                }
-            }
-            try {
-                windowManager.addView(menuView, menuParams)
-                bubbleView.visibility = View.GONE
-                isMenuOpen = true
-            } catch (_: Exception) {}
+            windowManager.addView(menuView, menuParams)
+            bubbleView.visibility = View.GONE
+            isMenuOpen = true
+            // Instant 1-tap read & draft!
+            triggerAi(DatingStage.AUTO_DETECT)
         }
     }
 
     private fun closeMenu() {
-        if (isMenuOpen) {
-            try {
-                windowManager.removeView(menuView)
-            } catch (_: Exception) {}
+        if (isMenuOpen && menuView.isAttachedToWindow) {
+            windowManager.removeView(menuView)
             bubbleView.visibility = View.VISIBLE
             isMenuOpen = false
         }
@@ -346,11 +351,11 @@ class FloatingOverlayService : Service() {
         super.onDestroy()
         isRunning = false
         serviceScope.cancel()
-        try {
-            if (::bubbleView.isInitialized) windowManager.removeView(bubbleView)
-        } catch (_: Exception) {}
-        try {
-            if (isMenuOpen && ::menuView.isInitialized) windowManager.removeView(menuView)
-        } catch (_: Exception) {}
+        if (::bubbleView.isInitialized && bubbleView.isAttachedToWindow) {
+            windowManager.removeView(bubbleView)
+        }
+        if (isMenuOpen && ::menuView.isInitialized && menuView.isAttachedToWindow) {
+            windowManager.removeView(menuView)
+        }
     }
 }
