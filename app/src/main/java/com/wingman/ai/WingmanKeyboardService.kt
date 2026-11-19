@@ -29,11 +29,23 @@ class WingmanKeyboardService : InputMethodService() {
         val tvSuggestion = view.findViewById<TextView>(R.id.kbTvSuggestion)
         val btnInsert = view.findViewById<Button>(R.id.kbBtnInsert)
 
-        fun fetchAi(stage: DatingStage) {
+        fun fetchAi(stage: DatingStage, flavor: HumorFlavor = HumorFlavor.WITTY_TEASE) {
             val prefs = getSharedPreferences("wingman_prefs", Context.MODE_PRIVATE)
             val apiKey = prefs.getString("gemini_api_key", "") ?: ""
-            val spots = prefs.getString("user_spots", "") ?: ""
-            val tone = prefs.getString("user_tone", "") ?: ""
+
+            val profile = FullUserProfile(
+                vitals = UserVitals(
+                    name = prefs.getString("user_name", "") ?: "",
+                    city = prefs.getString("user_city", "") ?: "",
+                    work = prefs.getString("user_work", "") ?: ""
+                ),
+                lifestyle = UserLifestyle(
+                    datingIntention = prefs.getString("user_intent", "") ?: ""
+                ),
+                interests = UserInterests(
+                    hobbies = (prefs.getString("user_hobbies", "") ?: "").split(",").map { it.trim() }
+                )
+            )
 
             // Extract context from preceding text or clipboard
             val textBefore = currentInputConnection?.getTextBeforeCursor(120, 0)?.toString() ?: ""
@@ -50,8 +62,9 @@ class WingmanKeyboardService : InputMethodService() {
                     apiKey = apiKey,
                     contextText = contextText,
                     stage = stage,
-                    userCityAndSpots = spots,
-                    userToneStyle = tone
+                    profile = profile,
+                    language = LanguageMode.ENGLISH,
+                    flavor = flavor
                 )
                 val replies = bundle.options
                 if (replies.isNotEmpty()) {
@@ -65,7 +78,7 @@ class WingmanKeyboardService : InputMethodService() {
         btnOpener.setOnClickListener { fetchAi(DatingStage.STAGE_1_HOOK_OPENER) }
         btnTease.setOnClickListener { fetchAi(DatingStage.STAGE_2_BANTER_TEASE) }
         btnDate.setOnClickListener { fetchAi(DatingStage.STAGE_4_DATE_CLOSER) }
-        btnCasual.setOnClickListener { fetchAi(DatingStage.STAGE_2_BANTER_TEASE) }
+        btnCasual.setOnClickListener { fetchAi(DatingStage.STAGE_2_BANTER_TEASE, HumorFlavor.DRY_SARCASM) }
 
         btnInsert.setOnClickListener {
             if (currentSuggestion.isNotBlank()) {
