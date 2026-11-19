@@ -20,12 +20,13 @@ class WingmanAccessibilityService : AccessibilityService() {
         }
 
         private fun extractText(node: AccessibilityNodeInfo?, sb: StringBuilder) {
-            if (node == null) return
+            if (node == null || sb.length > 4000) return
             val text = node.text
             if (!text.isNullOrBlank()) {
                 sb.append(text).append("\n")
             }
             for (i in 0 until node.childCount) {
+                if (sb.length > 4000) break
                 extractText(node.getChild(i), sb)
             }
         }
@@ -53,12 +54,22 @@ class WingmanAccessibilityService : AccessibilityService() {
 
         private fun findEditableNode(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
             if (node == null) return null
+            // First check if an input field currently has keyboard focus
+            val focused = node.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+            if (focused != null && (focused.isEditable || focused.className?.toString()?.contains("EditText", ignoreCase = true) == true)) {
+                return focused
+            }
+            return searchEditableNode(node)
+        }
+
+        private fun searchEditableNode(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+            if (node == null) return null
             if (node.isEditable) return node
             if (node.className?.toString()?.contains("EditText", ignoreCase = true) == true) {
                 return node
             }
             for (i in 0 until node.childCount) {
-                val child = findEditableNode(node.getChild(i))
+                val child = searchEditableNode(node.getChild(i))
                 if (child != null) return child
             }
             return null

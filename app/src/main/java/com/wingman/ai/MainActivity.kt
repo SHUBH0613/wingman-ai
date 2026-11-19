@@ -73,6 +73,21 @@ class MainActivity : AppCompatActivity() {
         setupListeners()
     }
 
+    override fun onResume() {
+        super.onResume()
+        updateOverlayButtonState()
+    }
+
+    private fun updateOverlayButtonState() {
+        if (FloatingOverlayService.isRunning) {
+            btnToggleOverlay.text = "Stop Floating Overlay Bubble"
+            btnToggleOverlay.backgroundTintList = getColorStateList(R.color.surface_variant)
+        } else {
+            btnToggleOverlay.text = "Start Floating Overlay Bubble (⚡ Auto-Type)"
+            btnToggleOverlay.backgroundTintList = getColorStateList(R.color.primary)
+        }
+    }
+
     private fun initViews() {
         etApiKey = findViewById(R.id.etApiKey)
         etName = findViewById(R.id.etName)
@@ -195,14 +210,63 @@ class MainActivity : AppCompatActivity() {
             val base64List = withContext(Dispatchers.IO) {
                 uris.mapNotNull { uri ->
                     try {
+                        // Pass 1: Decode image dimensions only
+                        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                         contentResolver.openInputStream(uri)?.use { input ->
-                            val bitmap = BitmapFactory.decodeStream(input)
-                            val scaled = Bitmap.createScaledBitmap(bitmap, 640, 640 * bitmap.height / bitmap.width, true)
-                            val baos = ByteArrayOutputStream()
-                            scaled.compress(Bitmap.CompressFormat.JPEG, 75, baos)
-                            Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+                            BitmapFactory.decodeStream(input, null, options)
                         }
-                    } catch (e: Exception) {
+
+                        if (options.outWidth <= 0 || options.outHeight <= 0) return@mapNotNull null
+
+                        // Calculate inSampleSize for efficient downsampling (max dimension ~800px)
+                        val maxTargetDim = 800
+                        var sampleSize = 1
+                        while (options.outWidth / (sampleSize * 2) >= maxTargetDim ||
+                            options.outHeight / (sampleSize * 2) >= maxTargetDim) {
+                            sampleSize *= 2
+                        }
+
+                        // Pass 2: Decode downsampled bitmap
+                        val decodeOptions = BitmapFactory.Options().apply {
+                            inSampleSize = sampleSize
+                            inPreferredConfig = Bitmap.Config.RGB_565
+                        }
+
+                        val bitmap = contentResolver.openInputStream(uri)?.use { input ->
+                            BitmapFactory.decodeStream(input, null, decodeOptions)
+                        } ?: return@mapNotNull null
+
+                        val w = bitmap.width
+                        val h = bitmap.height
+                        if (w <= 0 || h <= 0) {
+                            bitmap.recycle()
+                            return@mapNotNull null
+                        }
+
+                        // Scale smoothly to max dimension 640px
+                        val finalW: Int
+                        val finalH: Int
+                        if (w >= h) {
+                            finalW = minOf(640, w)
+                            finalH = maxOf(1, (h * finalW) / w)
+                        } else {
+                            finalH = minOf(640, h)
+                            finalW = maxOf(1, (w * finalH) / h)
+                        }
+
+                        val scaled = if (w != finalW || h != finalH) {
+                            Bitmap.createScaledBitmap(bitmap, finalW, finalH, true).also {
+                                if (it != bitmap) bitmap.recycle()
+                            }
+                        } else {
+                            bitmap
+                        }
+
+                        val baos = ByteArrayOutputStream()
+                        scaled.compress(Bitmap.CompressFormat.JPEG, 75, baos)
+                        scaled.recycle()
+                        Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+                    } catch (e: Throwable) {
                         null
                     }
                 }
@@ -244,7 +308,7 @@ class MainActivity : AppCompatActivity() {
                 workout = etHabits.text.toString().trim()
             ),
             interests = UserInterests(
-                hobbies = etHobbiesSkills.text.toString().split(",").map { it.trim() },
+                hobbies = etHobbiesSkills.text.toString().split(",").map { it.trim() }.filter { it.isNotBlank() },
                 musicAndFood = etMusicFood.text.toString().trim()
             )
         )
@@ -281,6 +345,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkOverlayPermissionAndStart() {
+        if (FloatingOverlayService.isRunning) {
+            val stopIntent = Intent(this, FloatingOverlayService::class.java).apply {
+                action = FloatingOverlayService.ACTION_STOP
+            }
+            startService(stopIntent)
+            Toast.makeText(this, "Wingman Floating Bubble Stopped.", Toast.LENGTH_SHORT).show()
+            btnToggleOverlay.postDelayed({ updateOverlayButtonState() }, 200)
+            return
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             Toast.makeText(this, "Please grant 'Display over other apps' permission", Toast.LENGTH_LONG).show()
             val intent = Intent(
@@ -296,6 +370,7 @@ class MainActivity : AppCompatActivity() {
                 startService(intent)
             }
             Toast.makeText(this, "Wingman Floating Bubble Started! (⚡ Auto-Type Ready)", Toast.LENGTH_LONG).show()
+            btnToggleOverlay.postDelayed({ updateOverlayButtonState() }, 200)
         }
     }
 }

@@ -26,9 +26,16 @@ import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class FloatingOverlayService : Service() {
+
+    companion object {
+        var isRunning = false
+            private set
+        const val ACTION_STOP = "com.wingman.ai.action.STOP"
+    }
 
     private lateinit var windowManager: WindowManager
     private lateinit var bubbleView: View
@@ -46,11 +53,20 @@ class FloatingOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
         startForegroundServiceNotification()
         setupBubbleView()
         setupMenuView()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        return START_STICKY
     }
 
     private fun startForegroundServiceNotification() {
@@ -62,7 +78,7 @@ class FloatingOverlayService : Service() {
                 NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            manager?.createNotificationChannel(channel)
         }
 
         val notification: Notification = NotificationCompat.Builder(this, channelId)
@@ -124,7 +140,9 @@ class FloatingOverlayService : Service() {
                     }
                     bubbleParams!!.x = initialX + deltaX
                     bubbleParams!!.y = initialY + deltaY
-                    windowManager.updateViewLayout(bubbleView, bubbleParams)
+                    try {
+                        windowManager.updateViewLayout(bubbleView, bubbleParams)
+                    } catch (_: Exception) {}
                     true
                 }
                 MotionEvent.ACTION_UP -> {
@@ -137,7 +155,9 @@ class FloatingOverlayService : Service() {
             }
         }
 
-        windowManager.addView(bubbleView, bubbleParams)
+        try {
+            windowManager.addView(bubbleView, bubbleParams)
+        } catch (_: Exception) {}
     }
 
     private fun setupMenuView() {
@@ -196,31 +216,23 @@ class FloatingOverlayService : Service() {
             val prefs = getSharedPreferences("wingman_prefs", Context.MODE_PRIVATE)
             val apiKey = prefs.getString("gemini_api_key", "") ?: ""
 
-            val profile = FullUserProfile(
-                vitals = UserVitals(
-                    name = prefs.getString("user_name", "") ?: "",
-                    city = prefs.getString("user_spots", "") ?: "",
-                    work = prefs.getString("user_work", "") ?: ""
-                ),
-                lifestyle = UserLifestyle(
-                    datingIntention = prefs.getString("user_intent", "Dating") ?: ""
-                ),
-                interests = UserInterests(
-                    hobbies = (prefs.getString("user_passions", "") ?: "").split(",").map { it.trim() }
-                )
-            )
+            val profile = FullUserProfile.fromPreferences(prefs)
 
-            // 1. Accessibility screen reader
-            var contextText = WingmanAccessibilityService.getVisibleScreenText()
+            // 1. Check user-typed context, 2. Accessibility screen text, 3. Clipboard
+            var contextText = etContext.text.toString().trim()
             if (contextText.isBlank()) {
-                contextText = etContext.text.toString().trim()
+                contextText = WingmanAccessibilityService.getVisibleScreenText()
             }
             if (contextText.isBlank()) {
                 val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                contextText = clipboard.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
+                if (clipboard.hasPrimaryClip() && clipboard.primaryClip != null && clipboard.primaryClip!!.itemCount > 0) {
+                    contextText = clipboard.primaryClip!!.getItemAt(0)?.text?.toString() ?: ""
+                }
             }
 
-            etContext.setText(contextText.take(120))
+            if (contextText.isNotBlank()) {
+                etContext.setText(contextText.take(150))
+            }
             progressBar.visibility = View.VISIBLE
             btnAutoType.visibility = View.GONE
             tvOption1.text = "Crafting human-like responses with Gemini..."
@@ -242,6 +254,7 @@ class FloatingOverlayService : Service() {
                 if (results.isNotEmpty()) {
                     selectedReply = results[0]
                     tvOption1.text = results[0]
+                    highlightOption(tvOption1, tvOption2, tvOption3)
                     btnAutoType.visibility = View.VISIBLE
                     tvOption1.setOnClickListener {
                         selectedReply = results[0]
@@ -297,15 +310,33 @@ class FloatingOverlayService : Service() {
 
     private fun openMenu() {
         if (!isMenuOpen) {
-            windowManager.addView(menuView, menuParams)
-            bubbleView.visibility = View.GONE
-            isMenuOpen = true
+            // Auto pre-populate context if empty
+            val etContext = menuView.findViewById<EditText>(R.id.etChatContext)
+            if (etContext.text.isNullOrBlank()) {
+                val screenText = WingmanAccessibilityService.getVisibleScreenText()
+                if (screenText.isNotBlank()) {
+                    etContext.setText(screenText.take(150))
+                } else {
+                    val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                    if (clipboard.hasPrimaryClip() && clipboard.primaryClip != null && clipboard.primaryClip!!.itemCount > 0) {
+                        val clip = clipboard.primaryClip!!.getItemAt(0)?.text?.toString() ?: ""
+                        if (clip.isNotBlank()) etContext.setText(clip.take(150))
+                    }
+                }
+            }
+            try {
+                windowManager.addView(menuView, menuParams)
+                bubbleView.visibility = View.GONE
+                isMenuOpen = true
+            } catch (_: Exception) {}
         }
     }
 
     private fun closeMenu() {
         if (isMenuOpen) {
-            windowManager.removeView(menuView)
+            try {
+                windowManager.removeView(menuView)
+            } catch (_: Exception) {}
             bubbleView.visibility = View.VISIBLE
             isMenuOpen = false
         }
@@ -313,7 +344,13 @@ class FloatingOverlayService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (::bubbleView.isInitialized) windowManager.removeView(bubbleView)
-        if (isMenuOpen) windowManager.removeView(menuView)
+        isRunning = false
+        serviceScope.cancel()
+        try {
+            if (::bubbleView.isInitialized) windowManager.removeView(bubbleView)
+        } catch (_: Exception) {}
+        try {
+            if (isMenuOpen && ::menuView.isInitialized) windowManager.removeView(menuView)
+        } catch (_: Exception) {}
     }
 }

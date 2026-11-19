@@ -1,5 +1,7 @@
 package com.wingman.ai
 
+import android.content.SharedPreferences
+
 enum class DatingStage {
     AUTO_DETECT,
     STAGE_1_HOOK_OPENER,
@@ -54,4 +56,37 @@ data class FullUserProfile(
     val interests: UserInterests,
     val preferredLanguage: LanguageMode = LanguageMode.ENGLISH,
     val preferredHumor: HumorFlavor = HumorFlavor.WITTY_TEASE
-)
+) {
+    companion object {
+        fun fromPreferences(prefs: SharedPreferences): FullUserProfile {
+            val hobbiesStr = prefs.getString("user_hobbies", null)
+                ?: prefs.getString("user_passions", "") ?: ""
+            val hobbiesList = hobbiesStr.split(",")
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+
+            val cityStr = prefs.getString("user_city", null)
+                ?: prefs.getString("user_spots", "") ?: ""
+
+            val habitsStr = prefs.getString("user_habits", "") ?: ""
+
+            return FullUserProfile(
+                vitals = UserVitals(
+                    name = prefs.getString("user_name", "") ?: "",
+                    age = prefs.getString("user_age", "25")?.toIntOrNull() ?: 25,
+                    height = prefs.getString("user_height", "") ?: "",
+                    city = cityStr,
+                    work = prefs.getString("user_work", "") ?: ""
+                ),
+                lifestyle = UserLifestyle(
+                    datingIntention = prefs.getString("user_intent", "Looking for connection") ?: "",
+                    workout = habitsStr
+                ),
+                interests = UserInterests(
+                    hobbies = hobbiesList,
+                    musicAndFood = prefs.getString("user_music_food", "") ?: ""
+                )
+            )
+        }
+    }
+}

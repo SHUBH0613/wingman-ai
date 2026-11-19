@@ -1,5 +1,6 @@
 package com.wingman.ai
 
+import com.google.gson.Gson
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -57,5 +58,68 @@ class WingmanUnitTest {
         assertEquals(2, profile.interests.hobbies.size)
         assertEquals(LanguageMode.HINGLISH, profile.preferredLanguage)
         assertEquals(HumorFlavor.WITTY_TEASE, profile.preferredHumor)
+    }
+
+    @Test
+    fun testCleanJsonWithMarkdownFences() {
+        val rawMarkdown = """
+            ```json
+            {
+              "detectedStage": "Banter",
+              "options": ["Hey", "Hi"],
+              "strategicTip": "Keep teasing"
+            }
+            ```
+        """.trimIndent()
+
+        val cleaned = GeminiDatingEngine.cleanJson(rawMarkdown)
+        assertTrue(cleaned.startsWith("{"))
+        assertTrue(cleaned.endsWith("}"))
+
+        val bundle = Gson().fromJson(cleaned, DatingReplyBundle::class.java)
+        assertEquals("Banter", bundle.detectedStage)
+        assertEquals(2, bundle.options.size)
+        assertEquals("Keep teasing", bundle.strategicTip)
+    }
+
+    @Test
+    fun testCleanJsonPlain() {
+        val plainJson = """{"photoScores":[],"optimalSequence":[0,1],"overallSummary":"Good"}"""
+        val cleaned = PhotoAuditor.cleanJson(plainJson)
+        assertEquals(plainJson, cleaned)
+
+        val report = Gson().fromJson(cleaned, PhotoAuditReport::class.java)
+        assertEquals(2, report.optimalSequence.size)
+        assertEquals("Good", report.overallSummary)
+    }
+
+    @Test
+    fun testProfileResultParsing() {
+        val sampleJson = """
+            ```json
+            {
+              "hingePacks": [
+                [{"promptTitle": "Win me over", "answer": "Good tacos"}]
+              ],
+              "bumbleBios": ["Bio 1"],
+              "openingMoves": ["Move 1"],
+              "hinglishBonusBio": "Chai and talks"
+            }
+            ```
+        """.trimIndent()
+        val cleaned = ProfileGenerator.cleanJson(sampleJson)
+        val result = Gson().fromJson(cleaned, ProfileResult::class.java)
+        assertNotNull(result)
+        assertEquals(1, result.hingePacks.size)
+        assertEquals(1, result.bumbleBios.size)
+        assertEquals("Bio 1", result.bumbleBios[0])
+        assertEquals("Chai and talks", result.hinglishBonusBio)
+    }
+
+    @Test
+    fun testGeminiModelConstant() {
+        assertEquals("gemini-2.0-flash", GeminiDatingEngine.PRIMARY_MODEL)
+        assertEquals("gemini-2.0-flash", PhotoAuditor.PRIMARY_MODEL)
+        assertEquals("gemini-2.0-flash", ProfileGenerator.PRIMARY_MODEL)
     }
 }

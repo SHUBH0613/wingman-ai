@@ -28,6 +28,8 @@ data class PhotoAuditReport(
 
 object PhotoAuditor {
 
+    const val PRIMARY_MODEL = "gemini-2.0-flash"
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -35,6 +37,19 @@ object PhotoAuditor {
 
     private val gson = Gson()
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+
+    fun cleanJson(raw: String): String {
+        var cleaned = raw.trim()
+        if (cleaned.startsWith("```json", ignoreCase = true)) {
+            cleaned = cleaned.substring(7).trim()
+        } else if (cleaned.startsWith("```")) {
+            cleaned = cleaned.substring(3).trim()
+        }
+        if (cleaned.endsWith("```")) {
+            cleaned = cleaned.substring(0, cleaned.length - 3).trim()
+        }
+        return cleaned
+    }
 
     suspend fun auditPhotos(
         apiKey: String,
@@ -103,7 +118,7 @@ object PhotoAuditor {
             add("generationConfig", genConfig)
         }
 
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$PRIMARY_MODEL:generateContent?key=$apiKey"
         val request = Request.Builder()
             .url(url)
             .post(requestJson.toString().toRequestBody(jsonMediaType))
@@ -115,14 +130,19 @@ object PhotoAuditor {
             if (!response.isSuccessful) return@withContext null
 
             val responseObj = gson.fromJson(body, JsonObject::class.java)
-            val candidates = responseObj.getAsJsonArray("candidates")
+            val candidates = responseObj?.getAsJsonArray("candidates")
             if (candidates != null && candidates.size() > 0) {
                 val candidate = candidates[0].asJsonObject
-                val text = candidate.getAsJsonObject("content").getAsJsonArray("parts")[0].asJsonObject.get("text").asString
-                return@withContext gson.fromJson(text, PhotoAuditReport::class.java)
+                val content = candidate.getAsJsonObject("content")
+                val parts = content?.getAsJsonArray("parts")
+                if (parts != null && parts.size() > 0) {
+                    val rawText = parts[0].asJsonObject.get("text")?.asString ?: ""
+                    val cleaned = cleanJson(rawText)
+                    return@withContext gson.fromJson(cleaned, PhotoAuditReport::class.java)
+                }
             }
             null
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             null
         }
     }

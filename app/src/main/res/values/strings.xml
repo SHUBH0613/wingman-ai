@@ -1,4 +1,6 @@
 <resources>
     <string name="app_name">Wingman AI</string>
     <string name="accessibility_service_description">Reads chat and profile prompts on Hinge, Bumble, and Instagram to generate instant witty openers and replies.</string>
+    <string name="accessibility_service_label">Wingman Dating Assistant</string>
+    <string name="keyboard_service_label">Wingman AI Keyboard</string>
 </resources>

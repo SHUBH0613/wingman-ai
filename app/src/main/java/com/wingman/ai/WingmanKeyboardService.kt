@@ -11,12 +11,18 @@ import android.widget.TextView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class WingmanKeyboardService : InputMethodService() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private var currentSuggestion: String = ""
+
+    override fun onDestroy() {
+        super.onDestroy()
+        serviceScope.cancel()
+    }
 
     override fun onCreateInputView(): View {
         val view = layoutInflater.inflate(R.layout.layout_keyboard, null)
@@ -33,24 +39,16 @@ class WingmanKeyboardService : InputMethodService() {
             val prefs = getSharedPreferences("wingman_prefs", Context.MODE_PRIVATE)
             val apiKey = prefs.getString("gemini_api_key", "") ?: ""
 
-            val profile = FullUserProfile(
-                vitals = UserVitals(
-                    name = prefs.getString("user_name", "") ?: "",
-                    city = prefs.getString("user_city", "") ?: "",
-                    work = prefs.getString("user_work", "") ?: ""
-                ),
-                lifestyle = UserLifestyle(
-                    datingIntention = prefs.getString("user_intent", "") ?: ""
-                ),
-                interests = UserInterests(
-                    hobbies = (prefs.getString("user_hobbies", "") ?: "").split(",").map { it.trim() }
-                )
-            )
+            val profile = FullUserProfile.fromPreferences(prefs)
 
             // Extract context from preceding text or clipboard
             val textBefore = currentInputConnection?.getTextBeforeCursor(120, 0)?.toString() ?: ""
             val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-            val clipText = clipboard.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
+            val clipText = if (clipboard.hasPrimaryClip() && clipboard.primaryClip != null && clipboard.primaryClip!!.itemCount > 0) {
+                clipboard.primaryClip!!.getItemAt(0)?.text?.toString() ?: ""
+            } else {
+                ""
+            }
 
             val contextText = if (textBefore.isNotBlank()) textBefore else clipText
 
