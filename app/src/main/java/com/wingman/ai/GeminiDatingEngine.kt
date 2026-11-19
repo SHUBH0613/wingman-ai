@@ -10,14 +10,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
-enum class DatingStage {
-    AUTO_DETECT,
-    STAGE_1_HOOK_OPENER,
-    STAGE_2_BANTER_TEASE,
-    STAGE_3_COMMON_GROUND,
-    STAGE_4_DATE_CLOSER
-}
-
 data class DatingReplyBundle(
     val detectedStage: String,
     val options: List<String>,
@@ -28,7 +20,7 @@ object GeminiDatingEngine {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(25, TimeUnit.SECONDS)
         .build()
 
     private val gson = Gson()
@@ -38,8 +30,9 @@ object GeminiDatingEngine {
         apiKey: String,
         contextText: String,
         stage: DatingStage,
-        userCityAndSpots: String,
-        userToneStyle: String
+        profile: FullUserProfile,
+        language: LanguageMode,
+        flavor: HumorFlavor
     ): DatingReplyBundle = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) {
             return@withContext DatingReplyBundle(
@@ -49,42 +42,60 @@ object GeminiDatingEngine {
             )
         }
 
+        val languageInstructions = when (language) {
+            LanguageMode.ENGLISH -> "Respond in natural, witty, modern English."
+            LanguageMode.HINGLISH -> """
+                Respond in authentic HINGLISH (Hindi-English mix commonly texted by young professionals in Mumbai, Delhi, Bangalore).
+                Use casual romanized Hindi ('scene kya hai', 'batao', 'sahi hai', 'drama', 'chai/coffee pe chalte hain').
+                Avoid overly formal or cringe Bollywood lines; keep it charming, urban, and modern.
+            """.trimIndent()
+            LanguageMode.BILINGUAL_MIX -> "Provide a mix: Option 1 in English, Option 2 in Hinglish, Option 3 in a smooth bilingual blend."
+        }
+
+        val flavorInstructions = when (flavor) {
+            HumorFlavor.WITTY_TEASE -> "High playful push-pull, light teasing, self-assured confidence."
+            HumorFlavor.FILMY_DESI -> "Subtle, witty pop-culture or cinema references (Imtiaz Ali, Bollywood music, iconic relatable debates)."
+            HumorFlavor.DRY_SARCASM -> "Deadpan, observant, clever sarcasm, zero exclamation marks."
+            HumorFlavor.DATE_CLOSER -> "Smooth, casual pivot to meeting for coffee, drinks, or matcha this Thursday or Friday."
+        }
+
         val systemPrompt = """
-            You are Wingman AI, an elite dating conversational strategist for Bumble, Hinge, and Instagram.
-            You follow the proven 4-Stage Date Closer Playbook:
-            
-            THE 4-STAGE PLAYBOOK:
-            - STAGE 1: HOOK OPENER (Observation on a prompt/photo, playful challenge, zero generic 'Hey')
-            - STAGE 2: BANTER & TEASE (Playful push-pull, witty teasing, matching response length)
-            - STAGE 3: COMMON GROUND (Bridge to mutual interests, food, drinks, or weekend plans)
-            - STAGE 4: DATE CLOSER (Low-pressure invitation to drinks/coffee at a specific spot on Thursday/Friday, plus contact bridge)
+            You are Wingman AI, an elite dating conversational strategist for Bumble, Hinge, and Instagram DMs.
+            You have studied top-performing male profiles, viral Instagram hook formats, and high-conversion dating psychology.
             
             USER CONTEXT:
-            - City / Favorite Hangouts: ${userCityAndSpots.ifBlank { "Local neighborhood cafe or speakeasy cocktails" }}
-            - Humor / Persona: ${userToneStyle.ifBlank { "Playfully confident, observant, dry wit, unbothered" }}
-            - Requested Stage: ${stage.name}
+            - Name: ${profile.vitals.name}
+            - City / Favorite Spots: ${profile.vitals.city.ifBlank { "Local coffee shops or speakeasies" }}
+            - Career / College: ${profile.vitals.work} / ${profile.vitals.college}
+            - Hobbies / Passions: ${profile.interests.hobbies.joinToString(", ")}
+            - Dating Goals: ${profile.lifestyle.datingIntention}
             
-            RULES FOR HUMAN-LIKE TEXTS:
-            1. NEVER sound like ChatGPT. No exclamation mark overload, no formal essays.
-            2. Match modern texting etiquette: casual syntax, occasional lowercase, concise (1-2 sentences).
-            3. Always give 3 distinct options with varying levels of boldness:
-               - Option A: Balanced & Charming
-               - Option B: Bold / Flirty Tease
-               - Option C: Direct Date / Pivot Closer
+            LANGUAGE & STYLE:
+            $languageInstructions
+            $flavorInstructions
             
-            Return ONLY a valid JSON object matching:
+            REQUESTED STAGE: ${stage.name}
+            
+            CRITICAL RULES FOR DATING CHAT:
+            1. Zero generic AI phrases ('That sounds fascinating!', 'I completely understand', etc.).
+            2. Match texting etiquette: 1 to 2 lines max, casual punctuation, natural flow.
+            3. Never be lame or overly eager. Maintain equal or higher status with warmth.
+            4. If OPENER: focus on a specific, non-obvious detail from her bio or photo.
+            5. If DATE CLOSER: propose a concrete low-pressure activity in ${profile.vitals.city.ifBlank { "the city" }} this week.
+            
+            Return ONLY a valid JSON object matching this schema:
             {
-              "detectedStage": "Stage 2: Banter",
+              "detectedStage": "Banter & Chemistry",
               "options": [
                 "option 1",
                 "option 2",
                 "option 3"
               ],
-              "strategicTip": "She's matching your energy—pivot to drinks in your next text."
+              "strategicTip": "Keep the tease alive; let her qualify herself."
             }
         """.trimIndent()
 
-        val prompt = "Current Match Profile / Chat Context:\n\"$contextText\"\n\nGenerate the 3 options and strategic tip."
+        val prompt = "Match Profile / Chat Context:\n\"$contextText\"\n\nGenerate the 3 options and strategic tip."
 
         val requestJson = JsonObject().apply {
             val contentsArray = com.google.gson.JsonArray()
@@ -101,7 +112,7 @@ object GeminiDatingEngine {
 
             val genConfig = JsonObject().apply {
                 addProperty("responseMimeType", "application/json")
-                addProperty("temperature", 0.8)
+                addProperty("temperature", 0.85)
             }
             add("generationConfig", genConfig)
         }
@@ -119,7 +130,7 @@ object GeminiDatingEngine {
             if (!response.isSuccessful) {
                 return@withContext DatingReplyBundle(
                     detectedStage = "ERROR",
-                    options = listOf("Error calling Gemini API: HTTP ${response.code}"),
+                    options = listOf("Error calling Gemini: HTTP ${response.code}"),
                     strategicTip = "Check network or API key."
                 )
             }

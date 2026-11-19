@@ -8,6 +8,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
@@ -37,6 +38,8 @@ class FloatingOverlayService : Service() {
     private var menuParams: WindowManager.LayoutParams? = null
 
     private var isMenuOpen = false
+    private var activeLanguage = LanguageMode.ENGLISH
+    private var selectedReply: String = ""
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -154,6 +157,8 @@ class FloatingOverlayService : Service() {
         }
 
         val btnClose = menuView.findViewById<TextView>(R.id.btnCloseMenu)
+        val tvLangEn = menuView.findViewById<TextView>(R.id.tvLangEnglish)
+        val tvLangHinglish = menuView.findViewById<TextView>(R.id.tvLangHinglish)
         val btnOpener = menuView.findViewById<Button>(R.id.btnActionOpener)
         val btnBanter = menuView.findViewById<Button>(R.id.btnActionBanter)
         val btnDate = menuView.findViewById<Button>(R.id.btnActionDate)
@@ -162,32 +167,58 @@ class FloatingOverlayService : Service() {
         val tvOption1 = menuView.findViewById<TextView>(R.id.tvOption1)
         val tvOption2 = menuView.findViewById<TextView>(R.id.tvOption2)
         val tvOption3 = menuView.findViewById<TextView>(R.id.tvOption3)
+        val btnAutoType = menuView.findViewById<Button>(R.id.btnAutoType)
 
         btnClose.setOnClickListener { closeMenu() }
+
+        // Language toggle
+        tvLangEn.setOnClickListener {
+            activeLanguage = LanguageMode.ENGLISH
+            tvLangEn.setBackgroundColor(Color.parseColor("#E11D48"))
+            tvLangEn.setTextColor(Color.WHITE)
+            tvLangHinglish.setBackgroundColor(Color.parseColor("#334155"))
+            tvLangHinglish.setTextColor(Color.parseColor("#94A3B8"))
+        }
+
+        tvLangHinglish.setOnClickListener {
+            activeLanguage = LanguageMode.HINGLISH
+            tvLangHinglish.setBackgroundColor(Color.parseColor("#E11D48"))
+            tvLangHinglish.setTextColor(Color.WHITE)
+            tvLangEn.setBackgroundColor(Color.parseColor("#334155"))
+            tvLangEn.setTextColor(Color.parseColor("#94A3B8"))
+        }
 
         fun triggerAi(stage: DatingStage) {
             val prefs = getSharedPreferences("wingman_prefs", Context.MODE_PRIVATE)
             val apiKey = prefs.getString("gemini_api_key", "") ?: ""
-            val spots = prefs.getString("user_spots", "") ?: ""
-            val tone = prefs.getString("user_tone", "") ?: ""
 
-            // 1. Try reading screen text via Accessibility Service
+            val profile = FullUserProfile(
+                vitals = UserVitals(
+                    name = prefs.getString("user_name", "") ?: "",
+                    city = prefs.getString("user_spots", "") ?: "",
+                    work = prefs.getString("user_work", "") ?: ""
+                ),
+                lifestyle = UserLifestyle(
+                    datingIntention = prefs.getString("user_intent", "Dating") ?: ""
+                ),
+                interests = UserInterests(
+                    hobbies = (prefs.getString("user_passions", "") ?: "").split(",").map { it.trim() }
+                )
+            )
+
+            // 1. Accessibility screen reader
             var contextText = WingmanAccessibilityService.getVisibleScreenText()
-
-            // 2. Fallback to EditText if manually entered
             if (contextText.isBlank()) {
                 contextText = etContext.text.toString().trim()
             }
-
-            // 3. Fallback to Clipboard
             if (contextText.isBlank()) {
                 val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
                 contextText = clipboard.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
             }
 
             etContext.setText(contextText.take(120))
-
             progressBar.visibility = View.VISIBLE
+            btnAutoType.visibility = View.GONE
             tvOption1.text = "Crafting human-like responses with Gemini..."
             tvOption2.visibility = View.GONE
             tvOption3.visibility = View.GONE
@@ -197,25 +228,37 @@ class FloatingOverlayService : Service() {
                     apiKey = apiKey,
                     contextText = contextText,
                     stage = stage,
-                    userCityAndSpots = spots,
-                    userToneStyle = tone
+                    profile = profile,
+                    language = activeLanguage,
+                    flavor = HumorFlavor.WITTY_TEASE
                 )
                 progressBar.visibility = View.GONE
 
                 val results = bundle.options
                 if (results.isNotEmpty()) {
+                    selectedReply = results[0]
                     tvOption1.text = results[0]
-                    tvOption1.setOnClickListener { copyAndClose(results[0]) }
+                    btnAutoType.visibility = View.VISIBLE
+                    tvOption1.setOnClickListener {
+                        selectedReply = results[0]
+                        highlightOption(tvOption1, tvOption2, tvOption3)
+                    }
 
                     if (results.size > 1) {
                         tvOption2.visibility = View.VISIBLE
                         tvOption2.text = results[1]
-                        tvOption2.setOnClickListener { copyAndClose(results[1]) }
+                        tvOption2.setOnClickListener {
+                            selectedReply = results[1]
+                            highlightOption(tvOption2, tvOption1, tvOption3)
+                        }
                     }
                     if (results.size > 2) {
                         tvOption3.visibility = View.VISIBLE
                         tvOption3.text = results[2]
-                        tvOption3.setOnClickListener { copyAndClose(results[2]) }
+                        tvOption3.setOnClickListener {
+                            selectedReply = results[2]
+                            highlightOption(tvOption3, tvOption1, tvOption2)
+                        }
                     }
                 }
             }
@@ -224,6 +267,28 @@ class FloatingOverlayService : Service() {
         btnOpener.setOnClickListener { triggerAi(DatingStage.STAGE_1_HOOK_OPENER) }
         btnBanter.setOnClickListener { triggerAi(DatingStage.STAGE_2_BANTER_TEASE) }
         btnDate.setOnClickListener { triggerAi(DatingStage.STAGE_4_DATE_CLOSER) }
+
+        // Auto-Type execution
+        btnAutoType.setOnClickListener {
+            if (selectedReply.isNotBlank()) {
+                val typed = WingmanAccessibilityService.autoTypeIntoChat(selectedReply)
+                if (typed) {
+                    Toast.makeText(this, "⚡ Auto-typed! Review and press Send.", Toast.LENGTH_SHORT).show()
+                } else {
+                    // Fallback to clipboard
+                    val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Reply", selectedReply))
+                    Toast.makeText(this, "Copied to clipboard! (Enable Accessibility for auto-typing)", Toast.LENGTH_LONG).show()
+                }
+                closeMenu()
+            }
+        }
+    }
+
+    private fun highlightOption(selected: TextView, other1: TextView, other2: TextView) {
+        selected.setBackgroundColor(Color.parseColor("#BE123C"))
+        other1.setBackgroundColor(Color.parseColor("#334155"))
+        other2.setBackgroundColor(Color.parseColor("#334155"))
     }
 
     private fun openMenu() {
@@ -240,14 +305,6 @@ class FloatingOverlayService : Service() {
             bubbleView.visibility = View.VISIBLE
             isMenuOpen = false
         }
-    }
-
-    private fun copyAndClose(text: String) {
-        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("Wingman Reply", text)
-        clipboard.setPrimaryClip(clip)
-        Toast.makeText(this, "Copied! Paste into chat.", Toast.LENGTH_SHORT).show()
-        closeMenu()
     }
 
     override fun onDestroy() {

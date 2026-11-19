@@ -10,27 +10,19 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
-data class ProfileQuizData(
-    val passions: String,
-    val weekendVibe: String,
-    val guiltyPleasure: String,
-    val petPeeve: String,
-    val humorStyle: String,
-    val city: String
-)
-
 data class HingePrompt(val promptTitle: String, val answer: String)
 data class ProfileResult(
     val hingePacks: List<List<HingePrompt>>,
     val bumbleBios: List<String>,
-    val openingMoves: List<String>
+    val openingMoves: List<String>,
+    val hinglishBonusBio: String
 )
 
 object ProfileGenerator {
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(25, TimeUnit.SECONDS)
+        .readTimeout(35, TimeUnit.SECONDS)
         .build()
 
     private val gson = Gson()
@@ -38,21 +30,30 @@ object ProfileGenerator {
 
     suspend fun generateProfilePacks(
         apiKey: String,
-        quiz: ProfileQuizData
+        profile: FullUserProfile
     ): ProfileResult? = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) return@withContext null
 
         val systemPrompt = """
-            You are the world's top dating profile consultant for Hinge and Bumble.
-            You craft witty, authentic, attractive profiles that generate high match rates and high conversation starters.
+            You are the world's leading dating profile consultant specializing in male profiles for Hinge and Bumble.
+            You have studied top 1% dating profiles, viral Instagram reels, and modern psychological attraction triggers.
             
-            RULES FOR DATING PROFILES:
-            1. No clichés ('I love travel, gym, and good food', 'Partner in crime').
-            2. High Conversation Bait: Every prompt/bio must give matches an effortless reason to message first.
-            3. Humor & Edge: 1 part self-deprecating/playful wit, 1 part genuine personality.
-            4. Keep Bumble bios under 280 characters.
+            USER PROFILE DETAILS:
+            - Name: ${profile.vitals.name}, Age: ${profile.vitals.age}, Height: ${profile.vitals.height}
+            - City / Hometown: ${profile.vitals.city}
+            - Career & College: ${profile.vitals.work} / ${profile.vitals.college}
+            - Lifestyle Badges: Intention: ${profile.lifestyle.datingIntention}, Workout: ${profile.lifestyle.workout}, Drinking: ${profile.lifestyle.drinking}, Smoking: ${profile.lifestyle.smoking}
+            - Hobbies & Skills: ${profile.interests.hobbies.joinToString(", ")}; Skills: ${profile.interests.skills.joinToString(", ")}
+            - Music / Food / Quirks: ${profile.interests.musicAndFood}
+            - Pet Peeve / Guilty Pleasure: ${profile.interests.petPeeve} / ${profile.interests.guiltyPleasure}
             
-            Return ONLY a valid JSON object matching this schema:
+            RULES:
+            1. No clichés ('fluent in sarcasm', 'loves travel, dogs and pizza', 'partner in crime').
+            2. High Conversation Bait: Give matches effortless reasons to message first.
+            3. Balance: 1 part ambition/status, 1 part self-deprecating wit, 1 part genuine warmth.
+            4. Include both sharp modern English bios and 1 witty Hinglish bonus bio for urban Indian dating appeal.
+            
+            Return ONLY a valid JSON object matching:
             {
               "hingePacks": [
                 [
@@ -66,34 +67,22 @@ object ProfileGenerator {
                   {"promptTitle": "Dating me is like", "answer": "..."}
                 ],
                 [
-                  {"promptTitle": "Best travel story", "answer": "..."},
                   {"promptTitle": "My simple pleasures", "answer": "..."},
-                  {"promptTitle": "I'll brag about you to my friends if", "answer": "..."}
+                  {"promptTitle": "I'll brag about you to my friends if", "answer": "..."},
+                  {"promptTitle": "Best travel story", "answer": "..."}
                 ]
               ],
               "bumbleBios": [
-                "Bumble bio option 1 with hook (under 280 chars)",
-                "Bumble bio option 2 with hook (under 280 chars)",
-                "Bumble bio option 3 with hook (under 280 chars)"
+                "Bumble bio 1 under 280 chars",
+                "Bumble bio 2 under 280 chars",
+                "Bumble bio 3 under 280 chars"
               ],
               "openingMoves": [
-                "Bumble opening move question 1",
-                "Bumble opening move question 2",
-                "Bumble opening move question 3"
-              ]
+                "Opening move question 1",
+                "Opening move question 2"
+              ],
+              "hinglishBonusBio": "Urban witty Hinglish bio under 280 chars"
             }
-        """.trimIndent()
-
-        val userPrompt = """
-            User Quiz Profile:
-            - City: ${quiz.city}
-            - Passions/Obsessions: ${quiz.passions}
-            - Weekend Routine: ${quiz.weekendVibe}
-            - Guilty Pleasure: ${quiz.guiltyPleasure}
-            - Pet Peeve: ${quiz.petPeeve}
-            - Humor Style: ${quiz.humorStyle}
-            
-            Generate the 3 complete Hinge packs, 3 Bumble bios, and 3 opening moves.
         """.trimIndent()
 
         val requestJson = JsonObject().apply {
@@ -102,7 +91,7 @@ object ProfileGenerator {
             val partsArray = com.google.gson.JsonArray()
 
             partsArray.add(JsonObject().apply {
-                addProperty("text", "$systemPrompt\n\n$userPrompt")
+                addProperty("text", systemPrompt)
             })
 
             contentObj.add("parts", partsArray)

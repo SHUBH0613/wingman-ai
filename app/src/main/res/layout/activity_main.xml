@@ -4,38 +4,38 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background"
-    android:padding="20dp">
+    android:padding="16dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- Header -->
+        <!-- App Header -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Wingman AI"
+            android:text="Wingman AI 🔥"
             android:textColor="@color/primary"
-            android:textSize="28sp"
+            android:textSize="26sp"
             android:textStyle="bold" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="Autonomous Profile Doctor &amp; Live Chat Closer for Hinge &amp; Bumble"
+            android:text="Hinge &amp; Bumble Complete Profile Engine • Hinglish &amp; English • Auto-Type Copilot"
             android:textColor="@color/text_secondary"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
 
-        <!-- 1. API KEY & CITY CARD -->
+        <!-- API KEY CARD -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="14dp"
             app:cardBackgroundColor="@color/surface"
             app:cardCornerRadius="16dp"
-            app:contentPadding="16dp">
+            app:contentPadding="14dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -45,46 +45,44 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="🔑 Gemini API Key &amp; City"
+                    android:text="🔑 Gemini API Key"
                     android:textColor="@color/text_primary"
-                    android:textSize="16sp"
+                    android:textSize="15sp"
                     android:textStyle="bold" />
 
                 <EditText
                     android:id="@+id/etApiKey"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="6dp"
                     android:background="@color/surface_variant"
-                    android:hint="Gemini API Key (AIzaSy...)"
+                    android:hint="Paste Gemini API Key (AIzaSy...)"
                     android:inputType="textPassword"
                     android:padding="10dp"
                     android:textColor="@color/text_primary"
                     android:textColorHint="@color/text_secondary"
-                    android:textSize="14sp" />
-
-                <EditText
-                    android:id="@+id/etCityAndSpots"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@color/surface_variant"
-                    android:hint="City &amp; favorite date spots (e.g., Downtown, Soho, rooftop bars)"
-                    android:padding="10dp"
-                    android:textColor="@color/text_primary"
-                    android:textColorHint="@color/text_secondary"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 2. PHOTO DOCTOR: 6-METRIC AUDIT CARD -->
+        <!-- 3-STEP PROFILE WIZARD -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="📋 3-Step Profile Onboarding (Hinge &amp; Bumble)"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <!-- STEP 1: VITALS -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
             app:cardBackgroundColor="@color/surface"
-            app:cardCornerRadius="16dp"
-            app:contentPadding="16dp">
+            app:cardCornerRadius="14dp"
+            app:contentPadding="12dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -94,50 +92,89 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="📸 6-Metric Photo Auditor"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
+                    android:text="Step 1: Vitals &amp; Basics"
+                    android:textColor="@color/primary"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
 
-                <TextView
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="Select up to 10 photos to get AI scoring and your optimal 6-photo sequence."
-                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/etName"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="@color/surface_variant"
+                        android:hint="Name"
+                        android:padding="8dp"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/etAge"
+                        android:layout_width="70dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:background="@color/surface_variant"
+                        android:hint="Age"
+                        android:inputType="number"
+                        android:padding="8dp"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/etHeight"
+                        android:layout_width="80dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:background="@color/surface_variant"
+                        android:hint="Height (6'0)"
+                        android:padding="8dp"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_secondary"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <EditText
+                    android:id="@+id/etCity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:background="@color/surface_variant"
+                    android:hint="City / Neighborhood (e.g., Bandra, Indiranagar, Soho)"
+                    android:padding="8dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_secondary"
                     android:textSize="12sp" />
 
-                <Button
-                    android:id="@+id/btnSelectPhotos"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="10dp"
-                    android:backgroundTint="@color/surface_variant"
-                    android:text="Select Photos from Gallery"
-                    android:textColor="@color/text_primary" />
-
-                <TextView
-                    android:id="@+id/tvPhotoAuditResult"
+                <EditText
+                    android:id="@+id/etWorkCollege"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="6dp"
                     android:background="@color/surface_variant"
-                    android:padding="10dp"
-                    android:text="No photos analyzed yet."
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:visibility="gone" />
+                    android:hint="Work &amp; College (e.g., Product Designer @ Tech / IIT Delhi)"
+                    android:padding="8dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_secondary"
+                    android:textSize="12sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 3. PROFILE CREATOR: 60-SEC QUIZ -->
+        <!-- STEP 2: LIFESTYLE BADGES -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="10dp"
             app:cardBackgroundColor="@color/surface"
-            app:cardCornerRadius="16dp"
-            app:contentPadding="16dp">
+            app:cardCornerRadius="14dp"
+            app:contentPadding="12dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -147,55 +184,92 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="✍️ 60-Second Bio &amp; Hinge Prompt Crafter"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
+                    android:text="Step 2: Lifestyle &amp; Goals"
+                    android:textColor="@color/primary"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
 
                 <EditText
-                    android:id="@+id/etPassions"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@color/surface_variant"
-                    android:hint="Passions / obsessions (e.g., F1, house music, cooking Thai)"
-                    android:padding="10dp"
-                    android:textColor="@color/text_primary"
-                    android:textColorHint="@color/text_secondary"
-                    android:textSize="13sp" />
-
-                <EditText
-                    android:id="@+id/etWeekend"
+                    android:id="@+id/etDatingGoal"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:background="@color/surface_variant"
-                    android:hint="Weekend routine (e.g., farmers market, then dive bars)"
-                    android:padding="10dp"
+                    android:hint="Dating Intention (e.g., Long term, figuring it out, casual)"
+                    android:padding="8dp"
                     android:textColor="@color/text_primary"
                     android:textColorHint="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:textSize="12sp" />
 
                 <EditText
-                    android:id="@+id/etHumor"
+                    android:id="@+id/etHabits"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:background="@color/surface_variant"
-                    android:hint="Humor style (e.g., witty teasing, dry sarcasm, playful banter)"
-                    android:padding="10dp"
+                    android:hint="Habits (e.g., Gym 4x/wk, Social drinker, Non-smoker)"
+                    android:padding="8dp"
                     android:textColor="@color/text_primary"
                     android:textColorHint="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- STEP 3: HOBBIES & SKILLS -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="14dp"
+            app:contentPadding="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Step 3: Hobbies, Skills &amp; Quirks"
+                    android:textColor="@color/primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <EditText
+                    android:id="@+id/etHobbiesSkills"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:background="@color/surface_variant"
+                    android:hint="Top Hobbies &amp; Skills (e.g., F1, guitar, baking sourdough, poker)"
+                    android:padding="8dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <EditText
+                    android:id="@+id/etMusicFood"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:background="@color/surface_variant"
+                    android:hint="Music &amp; Food tastes (e.g., techno &amp; retro indie, street tacos &amp; biryani)"
+                    android:padding="8dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_secondary"
+                    android:textSize="12sp" />
 
                 <Button
                     android:id="@+id/btnGenerateProfile"
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
+                    android:layout_height="44dp"
                     android:layout_marginTop="10dp"
                     android:backgroundTint="@color/primary"
-                    android:text="Generate Hinge &amp; Bumble Packs"
-                    android:textColor="@color/white" />
+                    android:text="✨ Generate Hinge &amp; Bumble Packs (EN + Hinglish)"
+                    android:textColor="@color/white"
+                    android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/tvProfileResult"
@@ -205,20 +279,19 @@
                     android:background="@color/surface_variant"
                     android:padding="10dp"
                     android:textColor="@color/text_primary"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:visibility="gone" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 4. LIVE CHAT CLOSER: OVERLAY & KEYBOARD ACTIVATION -->
+        <!-- PHOTO AUDITOR CARD -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="32dp"
+            android:layout_marginTop="14dp"
             app:cardBackgroundColor="@color/surface"
             app:cardCornerRadius="16dp"
-            app:contentPadding="16dp">
+            app:contentPadding="14dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -228,34 +301,130 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="🚀 Live Dating Copilot Activation"
+                    android:text="📸 AI Photo Auditor &amp; Attractiveness Panel"
                     android:textColor="@color/text_primary"
-                    android:textSize="16sp"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Upload up to 10 photos to receive an overall score (0-100%), red-flag analysis, and optimal 6-photo sequence."
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/btnSelectPhotos"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="8dp"
+                    android:backgroundTint="@color/surface_variant"
+                    android:text="Select Photos from Gallery"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tvPhotoAuditResult"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@color/surface_variant"
+                    android:padding="10dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- VIRAL HOOKS & INSTAGRAM STUDY LIBRARY -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="16dp"
+            app:contentPadding="14dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🔥 Viral Openers &amp; Instagram Hooks"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Studied from top-converting male profiles and viral Instagram dating formats:"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/tvViralHooks"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@color/surface_variant"
+                    android:padding="10dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- LIVE COPILOT ACTIVATION -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:layout_marginBottom="32dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="16dp"
+            app:contentPadding="14dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🚀 Live Copilot &amp; Auto-Type Activation"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
                     android:textStyle="bold" />
 
                 <Button
                     android:id="@+id/btnToggleOverlay"
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="10dp"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="8dp"
                     android:backgroundTint="@color/primary"
-                    android:text="Start Floating Overlay Bubble"
+                    android:text="Start Floating Overlay Bubble (⚡ Auto-Type)"
                     android:textColor="@color/white" />
 
                 <Button
                     android:id="@+id/btnEnableAccessibility"
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="8dp"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="6dp"
                     android:backgroundTint="@color/surface_variant"
-                    android:text="Enable Screen Reader (Accessibility)"
+                    android:text="Enable Screen Reader &amp; Auto-Type (Accessibility)"
                     android:textColor="@color/text_primary" />
 
                 <Button
                     android:id="@+id/btnEnableKeyboard"
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="8dp"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="6dp"
                     android:backgroundTint="@color/surface_variant"
                     android:text="Enable Wingman Keyboard (IME)"
                     android:textColor="@color/text_primary" />
@@ -263,7 +432,7 @@
                 <Button
                     android:id="@+id/btnSaveSettings"
                     android:layout_width="match_parent"
-                    android:layout_height="44dp"
+                    android:layout_height="40dp"
                     android:layout_marginTop="8dp"
                     android:backgroundTint="@color/surface"
                     android:text="Save All Settings"

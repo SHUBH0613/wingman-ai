@@ -24,23 +24,37 @@ import java.io.ByteArrayOutputStream
 
 class MainActivity : AppCompatActivity() {
 
+    // Step 1: Vitals
     private lateinit var etApiKey: EditText
-    private lateinit var etCityAndSpots: EditText
-    private lateinit var etPassions: EditText
-    private lateinit var etWeekend: EditText
-    private lateinit var etHumor: EditText
+    private lateinit var etName: EditText
+    private lateinit var etAge: EditText
+    private lateinit var etHeight: EditText
+    private lateinit var etCity: EditText
+    private lateinit var etWorkCollege: EditText
 
-    private lateinit var btnSelectPhotos: Button
-    private lateinit var tvPhotoAuditResult: TextView
+    // Step 2: Lifestyle
+    private lateinit var etDatingGoal: EditText
+    private lateinit var etHabits: EditText
+
+    // Step 3: Interests & Quirks
+    private lateinit var etHobbiesSkills: EditText
+    private lateinit var etMusicFood: EditText
     private lateinit var btnGenerateProfile: Button
     private lateinit var tvProfileResult: TextView
 
+    // Photo Auditor
+    private lateinit var btnSelectPhotos: Button
+    private lateinit var tvPhotoAuditResult: TextView
+
+    // Viral Hooks
+    private lateinit var tvViralHooks: TextView
+
+    // Activations
     private lateinit var btnToggleOverlay: Button
     private lateinit var btnEnableAccessibility: Button
     private lateinit var btnEnableKeyboard: Button
     private lateinit var btnSaveSettings: Button
 
-    // Photo picker launcher (up to 10 photos)
     private val pickPhotosLauncher = registerForActivityResult(
         ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri> ->
@@ -55,20 +69,29 @@ class MainActivity : AppCompatActivity() {
 
         initViews()
         loadSettings()
+        displayViralHooks()
         setupListeners()
     }
 
     private fun initViews() {
         etApiKey = findViewById(R.id.etApiKey)
-        etCityAndSpots = findViewById(R.id.etCityAndSpots)
-        etPassions = findViewById(R.id.etPassions)
-        etWeekend = findViewById(R.id.etWeekend)
-        etHumor = findViewById(R.id.etHumor)
+        etName = findViewById(R.id.etName)
+        etAge = findViewById(R.id.etAge)
+        etHeight = findViewById(R.id.etHeight)
+        etCity = findViewById(R.id.etCity)
+        etWorkCollege = findViewById(R.id.etWorkCollege)
+
+        etDatingGoal = findViewById(R.id.etDatingGoal)
+        etHabits = findViewById(R.id.etHabits)
+
+        etHobbiesSkills = findViewById(R.id.etHobbiesSkills)
+        etMusicFood = findViewById(R.id.etMusicFood)
+        btnGenerateProfile = findViewById(R.id.btnGenerateProfile)
+        tvProfileResult = findViewById(R.id.tvProfileResult)
 
         btnSelectPhotos = findViewById(R.id.btnSelectPhotos)
         tvPhotoAuditResult = findViewById(R.id.tvPhotoAuditResult)
-        btnGenerateProfile = findViewById(R.id.btnGenerateProfile)
-        tvProfileResult = findViewById(R.id.tvProfileResult)
+        tvViralHooks = findViewById(R.id.tvViralHooks)
 
         btnToggleOverlay = findViewById(R.id.btnToggleOverlay)
         btnEnableAccessibility = findViewById(R.id.btnEnableAccessibility)
@@ -76,10 +99,21 @@ class MainActivity : AppCompatActivity() {
         btnSaveSettings = findViewById(R.id.btnSaveSettings)
     }
 
+    private fun displayViralHooks() {
+        val hooks = ViralHookLibrary.curatedHooks.take(5)
+        val sb = StringBuilder()
+        for (hook in hooks) {
+            sb.append("• [${hook.category} - ${hook.language}]:\n")
+            sb.append("\"${hook.hookText}\"\n")
+            sb.append("Why it works: ${hook.strategyNote}\n\n")
+        }
+        tvViralHooks.text = sb.toString().trim()
+    }
+
     private fun setupListeners() {
         btnSaveSettings.setOnClickListener {
             saveSettings()
-            Toast.makeText(this, "Settings saved!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Profile & settings saved!", Toast.LENGTH_SHORT).show()
         }
 
         btnSelectPhotos.setOnClickListener {
@@ -89,7 +123,7 @@ class MainActivity : AppCompatActivity() {
 
         btnGenerateProfile.setOnClickListener {
             saveSettings()
-            runProfileQuiz()
+            runProfileGeneration()
         }
 
         btnToggleOverlay.setOnClickListener {
@@ -100,13 +134,50 @@ class MainActivity : AppCompatActivity() {
         btnEnableAccessibility.setOnClickListener {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
             startActivity(intent)
-            Toast.makeText(this, "Enable 'Wingman Dating Assistant'", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Enable 'Wingman Dating Assistant' for Auto-Type!", Toast.LENGTH_LONG).show()
         }
 
         btnEnableKeyboard.setOnClickListener {
             val intent = Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)
             startActivity(intent)
             Toast.makeText(this, "Enable 'Wingman AI Keyboard'", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun runProfileGeneration() {
+        val apiKey = etApiKey.text.toString().trim()
+        if (apiKey.isBlank()) {
+            Toast.makeText(this, "Please enter your Gemini API Key!", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        tvProfileResult.visibility = View.VISIBLE
+        tvProfileResult.text = "Crafting high-conversion Hinge & Bumble packs with Gemini..."
+
+        val profile = buildFullProfile()
+
+        lifecycleScope.launch {
+            val result = ProfileGenerator.generateProfilePacks(apiKey, profile)
+            if (result != null) {
+                val sb = StringBuilder("✨ GENERATED PROFILE SUITE:\n\n")
+                sb.append("🐝 BUMBLE BIOS (English & Hinglish):\n")
+                result.bumbleBios.forEachIndexed { i, bio ->
+                    sb.append("${i + 1}. \"$bio\"\n\n")
+                }
+                sb.append("Bonus Hinglish Bio:\n\"${result.hinglishBonusBio}\"\n\n")
+
+                sb.append("🎯 HINGE PROMPT PACKS:\n")
+                result.hingePacks.forEachIndexed { packIdx, pack ->
+                    sb.append("--- Pack #${packIdx + 1} ---\n")
+                    pack.forEach { prompt ->
+                        sb.append("Q: ${prompt.promptTitle}\n")
+                        sb.append("A: ${prompt.answer}\n\n")
+                    }
+                }
+                tvProfileResult.text = sb.toString()
+            } else {
+                tvProfileResult.text = "Generation failed. Verify network and Gemini API key."
+            }
         }
     }
 
@@ -139,9 +210,9 @@ class MainActivity : AppCompatActivity() {
 
             val report = PhotoAuditor.auditPhotos(apiKey, base64List)
             if (report != null) {
-                val sb = StringBuilder("📸 6-Metric Audit Report:\n\n")
-                sb.append("Summary: ").append(report.overallSummary).append("\n\n")
-                sb.append("Optimal Upload Sequence: ")
+                val sb = StringBuilder("📸 AI Photo Audit & Attractiveness Report:\n\n")
+                sb.append("Diagnosis: ").append(report.overallSummary).append("\n\n")
+                sb.append("Optimal 6-Photo Sequence:\n")
                 sb.append(report.optimalSequence.map { "#${it + 1}" }.joinToString(" ➔ ")).append("\n\n")
 
                 for (score in report.photoScores) {
@@ -150,7 +221,7 @@ class MainActivity : AppCompatActivity() {
                     if (score.redFlags.isNotEmpty()) {
                         sb.append("• Red Flags: ${score.redFlags.joinToString(", ")}\n")
                     }
-                    sb.append("• Advice: ${score.recommendation}\n\n")
+                    sb.append("• Placement Advice: ${score.recommendation}\n\n")
                 }
                 tvPhotoAuditResult.text = sb.toString()
             } else {
@@ -159,66 +230,53 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun runProfileQuiz() {
-        val apiKey = etApiKey.text.toString().trim()
-        if (apiKey.isBlank()) {
-            Toast.makeText(this, "Enter Gemini API Key first!", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        tvProfileResult.visibility = View.VISIBLE
-        tvProfileResult.text = "Generating Hinge prompt packs & Bumble bios..."
-
-        val quiz = ProfileQuizData(
-            passions = etPassions.text.toString().trim(),
-            weekendVibe = etWeekend.text.toString().trim(),
-            guiltyPleasure = "Late night takeout",
-            petPeeve = "People walking too slow",
-            humorStyle = etHumor.text.toString().trim().ifBlank { "Playfully witty" },
-            city = etCityAndSpots.text.toString().trim().ifBlank { "City Center" }
+    private fun buildFullProfile(): FullUserProfile {
+        return FullUserProfile(
+            vitals = UserVitals(
+                name = etName.text.toString().trim().ifBlank { "User" },
+                age = etAge.text.toString().toIntOrNull() ?: 25,
+                height = etHeight.text.toString().trim().ifBlank { "5'11" },
+                city = etCity.text.toString().trim().ifBlank { "City Center" },
+                work = etWorkCollege.text.toString().trim()
+            ),
+            lifestyle = UserLifestyle(
+                datingIntention = etDatingGoal.text.toString().trim().ifBlank { "Looking for connection" },
+                workout = etHabits.text.toString().trim()
+            ),
+            interests = UserInterests(
+                hobbies = etHobbiesSkills.text.toString().split(",").map { it.trim() },
+                musicAndFood = etMusicFood.text.toString().trim()
+            )
         )
-
-        lifecycleScope.launch {
-            val result = ProfileGenerator.generateProfilePacks(apiKey, quiz)
-            if (result != null) {
-                val sb = StringBuilder("✨ Generated Profile Packs:\n\n")
-                sb.append("🐝 BUMBLE BIOS (Pick your favorite):\n")
-                result.bumbleBios.forEachIndexed { i, bio ->
-                    sb.append("${i + 1}. \"$bio\"\n\n")
-                }
-
-                sb.append("🎯 HINGE PROMPT PACKS:\n")
-                result.hingePacks.forEachIndexed { packIdx, pack ->
-                    sb.append("--- Pack #${packIdx + 1} ---\n")
-                    pack.forEach { prompt ->
-                        sb.append("Q: ${prompt.promptTitle}\n")
-                        sb.append("A: ${prompt.answer}\n\n")
-                    }
-                }
-                tvProfileResult.text = sb.toString()
-            } else {
-                tvProfileResult.text = "Generation failed. Verify API Key."
-            }
-        }
     }
 
     private fun loadSettings() {
         val prefs = getSharedPreferences("wingman_prefs", Context.MODE_PRIVATE)
         etApiKey.setText(prefs.getString("gemini_api_key", ""))
-        etCityAndSpots.setText(prefs.getString("user_spots", ""))
-        etPassions.setText(prefs.getString("user_passions", ""))
-        etWeekend.setText(prefs.getString("user_weekend", ""))
-        etHumor.setText(prefs.getString("user_tone", ""))
+        etName.setText(prefs.getString("user_name", ""))
+        etAge.setText(prefs.getString("user_age", ""))
+        etHeight.setText(prefs.getString("user_height", ""))
+        etCity.setText(prefs.getString("user_city", ""))
+        etWorkCollege.setText(prefs.getString("user_work", ""))
+        etDatingGoal.setText(prefs.getString("user_intent", ""))
+        etHabits.setText(prefs.getString("user_habits", ""))
+        etHobbiesSkills.setText(prefs.getString("user_hobbies", ""))
+        etMusicFood.setText(prefs.getString("user_music_food", ""))
     }
 
     private fun saveSettings() {
         val prefs = getSharedPreferences("wingman_prefs", Context.MODE_PRIVATE)
         prefs.edit()
             .putString("gemini_api_key", etApiKey.text.toString().trim())
-            .putString("user_spots", etCityAndSpots.text.toString().trim())
-            .putString("user_passions", etPassions.text.toString().trim())
-            .putString("user_weekend", etWeekend.text.toString().trim())
-            .putString("user_tone", etHumor.text.toString().trim())
+            .putString("user_name", etName.text.toString().trim())
+            .putString("user_age", etAge.text.toString().trim())
+            .putString("user_height", etHeight.text.toString().trim())
+            .putString("user_city", etCity.text.toString().trim())
+            .putString("user_work", etWorkCollege.text.toString().trim())
+            .putString("user_intent", etDatingGoal.text.toString().trim())
+            .putString("user_habits", etHabits.text.toString().trim())
+            .putString("user_hobbies", etHobbiesSkills.text.toString().trim())
+            .putString("user_music_food", etMusicFood.text.toString().trim())
             .apply()
     }
 
@@ -237,7 +295,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 startService(intent)
             }
-            Toast.makeText(this, "Wingman Floating Bubble Started! Open Hinge or Bumble.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Wingman Floating Bubble Started! (⚡ Auto-Type Ready)", Toast.LENGTH_LONG).show()
         }
     }
 }

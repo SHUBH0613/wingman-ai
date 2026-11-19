@@ -2,13 +2,13 @@
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/menuRoot"
-    android:layout_width="320dp"
+    android:layout_width="325dp"
     android:layout_height="wrap_content"
     app:cardBackgroundColor="@color/surface"
     app:cardCornerRadius="20dp"
-    app:cardElevation="12dp"
+    app:cardElevation="14dp"
     app:strokeColor="@color/surface_variant"
-    app:strokeWidth="1dp">
+    app:strokeWidth="1.5dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -16,7 +16,7 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Header -->
+        <!-- Top Header & Language Toggle -->
         <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
@@ -26,8 +26,41 @@
                 android:layout_height="wrap_content"
                 android:text="Wingman AI"
                 android:textColor="@color/primary"
-                android:textSize="18sp"
+                android:textSize="17sp"
                 android:textStyle="bold" />
+
+            <!-- Language Toggle Group -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_toStartOf="@id/btnCloseMenu"
+                android:layout_marginEnd="8dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvLangEnglish"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@color/primary"
+                    android:paddingHorizontal="6dp"
+                    android:paddingVertical="2dp"
+                    android:text="EN"
+                    android:textColor="@color/white"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvLangHinglish"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:background="@color/surface_variant"
+                    android:paddingHorizontal="6dp"
+                    android:paddingVertical="2dp"
+                    android:text="Hinglish"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/btnCloseMenu"
@@ -37,21 +70,21 @@
                 android:padding="4dp"
                 android:text="✕"
                 android:textColor="@color/text_secondary"
-                android:textSize="18sp" />
+                android:textSize="17sp" />
         </RelativeLayout>
 
-        <!-- Quick Action Buttons -->
+        <!-- Quick Stage Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="10dp"
             android:orientation="horizontal"
             android:weightSum="3">
 
             <Button
                 android:id="@+id/btnActionOpener"
                 android:layout_width="0dp"
-                android:layout_height="38dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:backgroundTint="@color/surface_variant"
                 android:insetTop="0dp"
@@ -64,7 +97,7 @@
             <Button
                 android:id="@+id/btnActionBanter"
                 android:layout_width="0dp"
-                android:layout_height="38dp"
+                android:layout_height="36dp"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:backgroundTint="@color/surface_variant"
@@ -78,7 +111,7 @@
             <Button
                 android:id="@+id/btnActionDate"
                 android:layout_width="0dp"
-                android:layout_height="38dp"
+                android:layout_height="36dp"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:backgroundTint="@color/primary"
@@ -90,19 +123,19 @@
                 android:textSize="11sp" />
         </LinearLayout>
 
-        <!-- Context input field (or paste her last message) -->
+        <!-- Context field -->
         <EditText
             android:id="@+id/etChatContext"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="8dp"
             android:background="@color/surface_variant"
-            android:hint="Paste her message or prompt..."
+            android:hint="Paste or auto-read match's bio/text..."
             android:maxLines="3"
             android:padding="8dp"
             android:textColor="@color/text_primary"
             android:textColorHint="@color/text_secondary"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
 
         <ProgressBar
             android:id="@+id/progressBar"
@@ -118,7 +151,7 @@
             android:id="@+id/suggestionsContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="8dp"
             android:orientation="vertical">
 
             <TextView
@@ -129,7 +162,7 @@
                 android:padding="10dp"
                 android:text="💡 Tap an action button to generate 3 tailored replies..."
                 android:textColor="@color/text_primary"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
 
             <TextView
                 android:id="@+id/tvOption2"
@@ -139,7 +172,7 @@
                 android:background="@color/surface_variant"
                 android:padding="10dp"
                 android:textColor="@color/text_primary"
-                android:textSize="13sp"
+                android:textSize="12sp"
                 android:visibility="gone" />
 
             <TextView
@@ -150,18 +183,32 @@
                 android:background="@color/surface_variant"
                 android:padding="10dp"
                 android:textColor="@color/text_primary"
-                android:textSize="13sp"
+                android:textSize="12sp"
                 android:visibility="gone" />
         </LinearLayout>
+
+        <!-- Auto-Type Action Button -->
+        <Button
+            android:id="@+id/btnAutoType"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="10dp"
+            android:backgroundTint="@color/primary"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:text="⚡ Auto-Type (You Send)"
+            android:textColor="@color/white"
+            android:textSize="12sp"
+            android:visibility="gone" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:layout_marginTop="8dp"
-            android:text="Tap any reply to copy &amp; minimize"
+            android:layout_marginTop="6dp"
+            android:text="Tap reply to select • Auto-Type inserts into chat"
             android:textColor="@color/text_secondary"
-            android:textSize="11sp" />
+            android:textSize="10sp" />
 
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
