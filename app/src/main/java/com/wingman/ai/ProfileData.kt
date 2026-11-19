@@ -1,5 +1,13 @@
 package com.wingman.ai
 
+enum class DatingStage {
+    AUTO_DETECT,
+    STAGE_1_HOOK_OPENER,
+    STAGE_2_BANTER_TEASE,
+    STAGE_3_COMMON_GROUND,
+    STAGE_4_DATE_CLOSER
+}
+
 enum class LanguageMode {
     ENGLISH,
     HINGLISH,
