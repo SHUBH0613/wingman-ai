@@ -30,7 +30,11 @@
             android:name=".FloatingOverlayService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="specialUse" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Floating overlay for AI dating assistant" />
+        </service>
 
         <!-- Wingman Screen Reader Accessibility Service -->
         <service

@@ -71,7 +71,11 @@ class FloatingOverlayService : Service() {
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .build()
 
-        startForeground(101, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(101, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(101, notification)
+        }
     }
 
     private fun setupBubbleView() {
