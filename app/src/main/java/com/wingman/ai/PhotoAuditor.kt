@@ -28,9 +28,10 @@ data class PhotoAuditReport(
 
 object PhotoAuditor {
 
-    const val PRIMARY_MODEL = "gemini-2.0-flash"
+    const val PRIMARY_MODEL = "gemini-3.5-flash-lite"
 
     private val client = OkHttpClient.Builder()
+        .addInterceptor(GeminiRetryInterceptor())
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .build()

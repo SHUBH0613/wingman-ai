@@ -132,8 +132,33 @@ class WingmanUnitTest {
 
     @Test
     fun testGeminiModelConstant() {
-        assertEquals("gemini-2.0-flash", GeminiDatingEngine.PRIMARY_MODEL)
-        assertEquals("gemini-2.0-flash", PhotoAuditor.PRIMARY_MODEL)
-        assertEquals("gemini-2.0-flash", ProfileGenerator.PRIMARY_MODEL)
+        assertEquals("gemini-3.5-flash-lite", GeminiDatingEngine.PRIMARY_MODEL)
+        assertEquals("gemini-3.5-flash-lite", PhotoAuditor.PRIMARY_MODEL)
+        assertEquals("gemini-3.5-flash-lite", ProfileGenerator.PRIMARY_MODEL)
+    }
+
+    @Test
+    fun testParseGeminiError() {
+        val sampleErrorJson = """
+            {
+              "error": {
+                "code": 404,
+                "message": "models/gemini-old is not found",
+                "status": "NOT_FOUND"
+              }
+            }
+        """.trimIndent()
+        val formatted = GeminiDatingEngine.parseGeminiError(404, sampleErrorJson)
+        assertTrue(formatted.contains("NOT_FOUND"))
+        assertTrue(formatted.contains("models/gemini-old is not found"))
+
+        val fallback = GeminiDatingEngine.parseGeminiError(500, "Internal error")
+        assertTrue(fallback.contains("500"))
+    }
+
+    @Test
+    fun testRetryInterceptorInstance() {
+        val interceptor = GeminiRetryInterceptor(maxRetries = 2, initialDelayMs = 50L)
+        assertNotNull(interceptor)
     }
 }

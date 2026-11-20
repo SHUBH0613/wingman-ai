@@ -20,9 +20,10 @@ data class ProfileResult(
 
 object ProfileGenerator {
 
-    const val PRIMARY_MODEL = "gemini-2.0-flash"
+    const val PRIMARY_MODEL = "gemini-3.5-flash-lite"
 
     private val client = OkHttpClient.Builder()
+        .addInterceptor(GeminiRetryInterceptor())
         .connectTimeout(25, TimeUnit.SECONDS)
         .readTimeout(35, TimeUnit.SECONDS)
         .build()

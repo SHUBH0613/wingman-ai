@@ -26,15 +26,32 @@ data class DatingReplyBundle(
 
 object GeminiDatingEngine {
 
-    const val PRIMARY_MODEL = "gemini-2.0-flash"
+    const val PRIMARY_MODEL = "gemini-3.5-flash-lite"
 
     private val client = OkHttpClient.Builder()
+        .addInterceptor(GeminiRetryInterceptor())
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(25, TimeUnit.SECONDS)
         .build()
 
     private val gson = Gson()
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+
+    fun parseGeminiError(statusCode: Int, body: String): String {
+        return try {
+            val json = gson.fromJson(body, JsonObject::class.java)
+            val errObj = json?.getAsJsonObject("error")
+            if (errObj != null) {
+                val msg = errObj.get("message")?.asString ?: "Unknown API error"
+                val status = errObj.get("status")?.asString ?: "HTTP $statusCode"
+                "API Error ($status): $msg"
+            } else {
+                "HTTP $statusCode: ${body.take(120)}"
+            }
+        } catch (e: Exception) {
+            "HTTP $statusCode error calling Gemini API"
+        }
+    }
 
     fun cleanJson(raw: String): String {
         var text = raw.trim()
@@ -174,10 +191,19 @@ object GeminiDatingEngine {
             val body = response.body?.string() ?: ""
 
             if (!response.isSuccessful) {
+                val errorDetail = parseGeminiError(response.code, body)
+                val tip = when (response.code) {
+                    400 -> "Verify your Gemini API key format and parameters."
+                    403 -> "API key lacks permission or quota exhausted."
+                    404 -> "Model endpoint not found. Using $PRIMARY_MODEL."
+                    429 -> "Rate limit exhausted after retries. Please wait a moment."
+                    503 -> "Google Gemini service temporarily overloaded."
+                    else -> "Check internet connection or verify API key in Settings."
+                }
                 return@withContext DatingReplyBundle(
                     detectedStage = "ERROR",
-                    options = listOf("Error calling Gemini API: HTTP ${response.code}"),
-                    strategicTip = "Check network or verify API key."
+                    options = listOf(errorDetail),
+                    strategicTip = tip
                 )
             }
 
